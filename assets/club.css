@@ -1,0 +1,63 @@
+.club-page { background: radial-gradient(ellipse at 70% 0, #271433, transparent 42rem), #0b080f; color: #faf8fd; padding: clamp(6.5rem,9vw,9rem) 1rem 5rem; min-height:100vh; font-family:Nunito, sans-serif; }
+.club-wrap { max-width:70rem; margin:auto; }
+.club-page h1,.club-page h2,.club-page h3 { font-weight:900; line-height:1.08; text-wrap:balance; }
+.club-page h1 { font-size:clamp(2.2rem,5.5vw,4.9rem); letter-spacing:-.045em; margin-bottom:1.35rem; }
+.club-page h2 { font-size:clamp(1.55rem,3vw,2.55rem); letter-spacing:-.035em; }
+.club-page p,.club-page small { color:#c9c0d1; line-height:1.5; }
+.club-machines,.club-person { display:grid; grid-template-columns:1.2fr 1fr; gap:1rem; }
+.club-box,.club-up,.club-person,.club-shelf article { border:1px solid #44334e; border-radius:1.3rem; background:#18121e; overflow:hidden; }
+.crate-art { width:100%; height:clamp(11rem,20vw,16rem); object-fit:cover; object-position:50% 53%; }
+.club-controls,.club-up,.club-bio { padding:clamp(1.2rem,3vw,2rem); display:grid; gap:1rem; align-content:start; }
+.club-up { background:radial-gradient(at top right,#48205b,transparent 65%),#19101f; }
+.club-switch { display:flex; flex-wrap:wrap; gap:.5rem; }
+.club-switch button,.club-page select,.club-action { border-radius:.7rem; padding:.65rem .94rem; min-height:2.75rem; font-weight:800; }
+.club-switch button,.club-page select { border:1px solid #695774; background:#211928; color:#faf6ff; }
+.club-switch [aria-pressed=true] { color:#cfff00; border-color:#cfff00; }
+.club-action { background:#cfff00; color:#16141a; justify-self:start; transition:transform .18s ease,background-color .18s ease; }
+.club-action:hover:enabled { transform:translateY(-2px); background:#ddff51; }
+.club-action:disabled { background:#3b3440; color:#c9c0cf; cursor:default; }
+.club-page button:focus-visible,.club-page select:focus-visible,.club-page summary:focus-visible { outline:2px solid #dbff46; outline-offset:3px; }
+.club-page summary { width:fit-content; cursor:pointer; }
+.club-page details p { margin-top:.5rem; font-size:.9rem; }
+.club-page label { display:grid; gap:.35rem; font-weight:700; }
+.club-balance,.club-rank,.club-tip { border:1px solid #735285; padding:.7rem .95rem; border-radius:.75rem; }
+.club-balance { display:flex; justify-content:space-between; align-items:center; color:#e7cfef; }
+.club-balance strong,.club-rank { color:#d4ff41; }
+.club-up .club-tip { border-style:dashed; }
+.club-result:not(:empty) { display:flex; gap:.85rem; align-items:center; padding:.65rem 1rem; margin-top:1rem; background:#22271a; border:1px solid #5d732c; border-radius:1rem; font-weight:750; }
+.club-result img { height:3.4rem; border-radius:.4rem; }
+.club-album { margin-top:2.6rem; }
+.club-album header { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+.club-album header span { color:#d4ff41; font-weight:800; }
+.club-shelf { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(13rem,100%),1fr)); gap:.7rem; }
+.club-shelf article { display:flex; align-items:center; gap:.85rem; padding:.6rem; border-radius:.85rem; }
+.club-shelf article img { width:3rem; aspect-ratio:3/4; object-fit:cover; border-radius:.4rem; filter:grayscale(1); opacity:.55; }
+.club-shelf .found { border-color:#70613a; }
+.club-shelf .found img { filter:none; opacity:1; }
+.club-shelf h3 { font-size:.99rem; margin-bottom:.3rem; }
+.club-person { gap:0; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); align-items:center; }
+.club-person > img { width:100%; max-height:36rem; object-fit:cover; object-position:50% 38%; }
+.club-bio h2 { font-size:clamp(2rem,4.5vw,4rem); }
+.club-bio > p { margin-top:1rem; }
+.club-pick { display:flex; align-items:center; gap:1rem; border-top:1px solid #45324e; padding-top:1rem; }
+.club-pick img { width:clamp(4.5rem,9vw,7rem); border-radius:.65rem; }
+.club-pick h3 { color:#ff95db; font-size:1.45rem; }
+.club-pick p { margin:.35rem 0 .8rem; }
+#catalog .den-catalog-card { display:flex; flex-direction:column; }
+#catalog .den-catalog-card > div:last-child { flex:1; display:flex; flex-direction:column; }
+#catalog .den-catalog-card > div:last-child > div:last-child { margin-top:auto; }
+.site-navigation { column-gap:clamp(.5rem,1.2vw,1.35rem); }
+.site-navigation button { font-size:.76rem; white-space:nowrap; }
+.site-mobile-menu { overflow-y:auto; overscroll-behavior:contain; }
+.site-mobile-menu > div { gap:.9rem; padding:1rem; }
+@media (min-width:1024px) and (max-width:1250px) {
+  .site-navigation { display:none; }
+  .site-menu-toggle { display:block; }
+}
+@media(max-width:680px) {
+  .club-machines,.club-person { grid-template-columns:1fr; }
+  .club-person > img { max-height:22rem; }
+  .club-page select { width:100%; min-width:0; }
+  .club-pick { align-items:flex-start; }
+}
+@media(prefers-reduced-motion:reduce) { .club-action { transition:none; } }

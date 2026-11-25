@@ -8,10 +8,18 @@ export const limitedChip = {
 const picture = name => new URL('../images/' + name + '.webp', import.meta.url).href;
 const cases = [
   {name: 'Огненный', ids: ['dragon', 'mushroom', 'mango', 'cheddar', 'troll']},
-  {name: 'Орбитальный', ids: ['kraken', 'alien', 'shark', 'wasabi', 'lit']}
+  {name: 'Орбитальный', ids: ['kraken', 'alien', 'shark', 'wasabi', 'lit']},
+  {name: 'Подземный', ids: ['sus', 'eclipse', 'siren', 'volt', 'lit']}
 ];
 const ranks = ['Классика', 'Неон', 'Хром', 'Ультра'];
 const empty = () => ({crumbs: 0, chips: {}});
+const modes = [
+  {chance:35, surcharge:0}, {chance:65, surcharge:1}, {chance:90, surcharge:3}
+];
+const motionMs = 2800;
+const winnerSlot = 28;
+const random = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
+const draw = ids => ids[Math.floor(random() * ids.length)];
 let connection;
 
 function database() {
@@ -79,6 +87,10 @@ export function createClub(React, products, useAccount, useCart) {
     const [result, show] = useState(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+    const [modeIndex, setMode] = useState(1);
+    const [reel, setReel] = useState(null);
+    const [wheel, setWheel] = useState(null);
+    const round = useRef(0);
     const active = useRef(true);
     const locked = useRef(false);
     useEffect(() => {
@@ -95,39 +107,51 @@ export function createClub(React, products, useAccount, useCart) {
     const owned = products.filter(item => items[item.id]);
     const target = owned.find(item => item.id === selected) || owned[0];
     const rank = target ? items[target.id].rank : 0;
-    const cost = (rank + 1) * 2;
+    const mode = modes[modeIndex];
+    const cost = rank + 1 + mode.surcharge;
     const box = cases[caseIndex];
 
-    async function mutate(edit, message) {
+    async function mutate(edit, animate, message) {
       if (locked.current || !album) return;
       locked.current = true;
-      setBusy(true); setError('');
+      setBusy(true); setError(''); show(null);
       try {
         const next = await albumFor(owner, edit);
-        if (active.current) { setAlbum(next); show(message(next)); }
+        if (!active.current) return;
+        const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : motionMs;
+        animate(++round.current, duration);
+        if (duration) await new Promise(resolve => setTimeout(resolve, duration));
+        if (active.current) { setAlbum(next); show(message()); }
       } catch (e) {
         if (active.current) setError(e.name === 'Error' ? e.message : 'Не удалось сохранить коллекцию.');
       } finally { locked.current = false; if (active.current) setBusy(false); }
     }
 
     function openCase() {
-      const id = box.ids[Math.floor(Math.random() * box.ids.length)];
+      const id = draw(box.ids);
+      const strip = Array.from({length:winnerSlot + 9}, () => draw(box.ids));
+      strip[winnerSlot] = id;
       mutate(next => {
         next.chips[id] ||= {count:0, rank:0};
         next.chips[id].count += 1;
         next.crumbs += 1;
-      }, () => ({id, text:'Из кейса выпал вкус «' + product(id).name + '». +1 крошка.'}));
+      }, (key, duration) => setReel({key, duration, strip}), () => ({id, text:'Из кейса выпал вкус «' + product(id).name + '». +1 крошка.'}));
     }
 
     function upgrade() {
       const id = target.id;
+      const fraction = random();
+      const won = fraction < mode.chance / 100;
+      const angle = fraction * 360;
       mutate(next => {
         const chip = next.chips[id];
         if (chip.rank !== rank || rank >= ranks.length - 1 || next.crumbs < cost)
           throw new Error('Баланс изменился. Обнови страницу и выбери вкус ещё раз.');
         next.crumbs -= cost;
-        chip.rank += 1;
-      }, () => ({id, text:target.name + ' получает ранг «' + ranks[rank + 1] + '».'}));
+        if (won) chip.rank += 1;
+      }, (key, duration) => setWheel({key, duration, angle, id}),
+        () => ({id, text:won ? target.name + ' получает ранг «' + ranks[rank + 1] + '».'
+          : 'Стрелка вне сектора. Вкус и ранг сохранены.'}));
     }
 
     return h(React.Fragment, null,
@@ -137,16 +161,33 @@ export function createClub(React, products, useAccount, useCart) {
           h('div', {className:'club-controls'},
             h('h2', null, 'Открыть кейс'),
             h('div', {className:'club-switch'}, ...cases.map((item,i) =>
-              h('button', {key:item.name, onClick:()=>setCase(i), 'aria-pressed':caseIndex===i}, item.name))),
-            h('p', null, 'Внутри один из пяти вкусов и одна крошка.'),
+              h('button', {key:item.name, disabled:busy, onClick:()=>{setCase(i); setReel(null);}, 'aria-pressed':caseIndex===i}, item.name))),
+            h('div', {className:'drop-reel', 'aria-hidden':true},
+              h('div', {key:reel?.key ?? box.name, className:reel ? 'drop-track rolling' : 'drop-track',
+                style:{'--travel':(-winnerSlot * 86 - 40) + 'px', '--run':(reel?.duration || 0) + 'ms'}},
+                ...(reel?.strip || [...box.ids,...box.ids]).map((id,index) =>
+                  h('div', {key:index, className:'drop-slot', 'data-chip':id,
+                    style:{'--glow':product(id).color}}, h('img', {src:product(id).image, alt:''}))))),
+            h('p', null, 'Пять вкусов с равным шансом. За открытие — одна крошка.'),
             h('details', null, h('summary', null, 'Что внутри'), h('p', null, box.ids.map(id => product(id).name).join(' · '))),
             h('button', {className:'club-action', disabled:busy || !album, onClick:openCase}, 'Открыть бесплатно'))),
         h('section', {className:'club-up'},
           h('div', {className:'club-balance'}, 'Крошки ', h('strong', null, album?.crumbs ?? '…')),
           h('h2', null, 'Апгрейдер'), h('p', null, 'Выбери вкус и потрать крошки, чтобы поднять его ранг.'),
+          h('div', {className:'upgrade-dial', style:{'--arc':mode.chance+'%'}},
+            h('div', {className:'dial-face'}, target && h('img',{src:target.image,alt:''}),
+              h('strong',null,mode.chance+'%'), h('small',null,'шанс улучшения')),
+            h('div', {key:wheel?.key ?? 'idle', 'aria-hidden':true,
+              className:wheel ? 'dial-arm spinning' : 'dial-arm',
+              style:{'--angle':(1440 + (wheel?.angle ?? 0))+'deg', '--run':(wheel?.duration || 0)+'ms'}})),
           target ? h(React.Fragment, null,
-            h('label', null, 'Вкус из коллекции', h('select', {value:target.id, onChange:e=>select(e.target.value)},
+            h('label', null, 'Вкус из коллекции', h('select', {value:target.id, disabled:busy,
+              onChange:e=>{select(e.target.value);setWheel(null);}},
               ...owned.map(item=>h('option', {key:item.id,value:item.id}, item.name)))),
+            h('div', {className:'club-switch', role:'group', 'aria-label':'Шанс улучшения'},
+              ...modes.map((option,i)=>h('button',{key:option.chance, disabled:busy || rank===3,
+                'aria-pressed':modeIndex===i, onClick:()=>{setMode(i);setWheel(null);}},option.chance+'%'))),
+            h('small',null,'Попади стрелкой в лаймовый сектор. При промахе расходуются только крошки.'),
             h('div', {className:'club-rank'}, ranks[rank], rank < 3 && ' → ' + ranks[rank+1]),
             h('button', {className:'club-action', onClick:upgrade, disabled:busy || rank===3 || album.crumbs<cost},
               rank===3 ? 'Максимальный ранг' : 'Улучшить за ' + cost + ' кр.'))

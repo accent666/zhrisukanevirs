@@ -61,3 +61,26 @@
   .club-pick { align-items:flex-start; }
 }
 @media(prefers-reduced-motion:reduce) { .club-action { transition:none; } }
+
+/* A fixed pitch keeps the awarded pack aligned with the centre marker at any viewport width. */
+.club-machines > * {min-width:0}
+.club-controls {grid-template-columns:minmax(0,1fr)}
+.club-box .crate-art {height:clamp(8rem,15vw,12rem)}
+.drop-reel {position:relative;height:122px;overflow:hidden;isolation:isolate;border-radius:12px;background:#0c090f;border:1px solid #55405c}
+.drop-reel::before {content:'';position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,#110b17 0%,transparent 18%,transparent 82%,#110b17);pointer-events:none}
+.drop-reel::after {content:'';position:absolute;inset:0 auto 0 50%;width:18px;transform:translateX(-50%);background:#daff50;clip-path:polygon(0 0,100% 0,55% 10%,55% 90%,100% 100%,0 100%,45% 90%,45% 10%);z-index:2}
+.drop-track {position:absolute;top:7px;left:50%;display:flex;gap:6px;width:max-content;transform:translateX(-298px)}
+.drop-track.rolling {animation:pack-travel var(--run) cubic-bezier(.09,.62,.14,1) both}
+.drop-slot {width:80px;height:106px;overflow:hidden;border-bottom:4px solid var(--glow);border-radius:6px;background:#1d1725}
+.drop-slot img {height:100%;width:100%;object-fit:cover}
+@keyframes pack-travel {from {transform:translateX(-298px)} to {transform:translateX(var(--travel))}}
+.upgrade-dial {width:min(100%,192px);aspect-ratio:1;position:relative;justify-self:center;margin:5px;display:grid;place-items:center;border-radius:50%;background:conic-gradient(#ceff38 0 var(--arc),#50305e var(--arc) 100%);box-shadow:0 0 0 4px #120d19,0 0 0 5px #65466b}
+.dial-face {border-radius:50%;width:83%;height:83%;display:grid;align-content:center;justify-items:center;isolation:isolate;overflow:hidden;position:relative;background:#120d19;border:3px solid #271631}
+.dial-face img {position:absolute;inset:0;z-index:-1;object-fit:cover;width:100%;height:100%;opacity:.23}
+.dial-face strong {color:#e4ff8e;font-size:2.8rem;line-height:1;font-weight:900}
+.dial-face small {color:white}
+.dial-arm {position:absolute;inset:-5px;pointer-events:none}
+.dial-arm::before {content:'';position:absolute;left:50%;top:-3px;transform:translateX(-50%);border:8px solid transparent;border-top:19px solid white;filter:drop-shadow(0 1px 2px black)}
+.dial-arm.spinning {animation:chip-spin var(--run) cubic-bezier(.18,.69,.14,1) both}
+@keyframes chip-spin {from {transform:rotate(0)} to {transform:rotate(var(--angle))}}
+@media(prefers-reduced-motion:reduce){.drop-track.rolling,.dial-arm.spinning{animation-duration:0s}}

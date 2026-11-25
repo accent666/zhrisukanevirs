@@ -1,11 +1,9 @@
-const filters = [['all','Все'],['лимитированные','Лимитки'],['острые','Острые'],['мясные','Мясные'],['концептуальные','Необычные']];
-const creators = {sus:'Супер Сус',lit:'Михаил Литвин',eclipse:'Влад А4',volt:'Wylsacom',siren:'Славный Друже'};
+const filters = [['all','Все'],['классические','Классика'],['лимитированные','Лимитки'],['острые','Острые'],['мясные','Мясные'],['концептуальные','Необычные']];
+const creators = {sus:'Супер Сус',lit:'Михаил Литвин',eclipse:'Влад А4'};
 const photoSources = [
   ['Супер Сус · Фокус','https://focus.ua/ratings/481700-top-50-blogerov-ukrainy-rejting-fokusa/grupa-7/2758/super-sus-vitaliy-lushkov'],
   ['Михаил Литвин · 24СМИ','https://24smi.org/celebrity/100883-mikhail-litvin.html'],
   ['Влад А4 · Узнай Всё','https://uznayvse.ru/znamenitosti/biografiya-vlad-bumaga.html'],
-  ['Wylsacom · Узнай Всё','https://uznayvse.ru/znamenitosti/biografiya-wylsacom.html'],
-  ['Славный Друже · Узнай Всё','https://uznayvse.ru/znamenitosti/biografiya-slavnyy-druzhe.html']
 ];
 export function storefront(React, Link, useLocation, useNavigate, Brand, products, useCart, useUser, icons, Wholesale, MapSection) {
   const h=React.createElement;
@@ -61,7 +59,7 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
       navigate({pathname:location.pathname,search:params.toString(),hash:location.hash},{replace:true,preventScrollReset:true});
     }
     const {addToCart}=useCart();
-    const sorted=['sus','lit','eclipse','siren','volt',...products.filter(p=>!creators[p.id]).map(p=>p.id)].map(byId);
+    const sorted=['sus','lit','eclipse',...products.filter(p=>p.category==='классические').map(p=>p.id),...products.filter(p=>!creators[p.id] && p.category!=='классические').map(p=>p.id)].map(byId);
     const visible=filter==='all'?sorted:sorted.filter(p=>p.category===filter);
     return h('section',{className:'store-catalog store-width',id:'catalog'},
       h('div',{className:'section-title'},h(location.pathname.startsWith('/catalog')?'h1':'h2',null,'Наши вкусы'),h('span',{'aria-live':'polite'},visible.length+' / '+products.length)),
@@ -87,7 +85,7 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
         ...[['wholesale','Оптовикам'],['map','Где купить']].map(([id,label])=>h('button',{key:id,'aria-expanded':info===id,onClick:()=>setInfo(info===id?'':id)},label))),
       info==='wholesale'&&h(Wholesale),info==='map'&&h(MapSection)),
       h('footer',{className:'store-width store-foot',id:'footer'},h('span',null,'ЖРИСУКА · Фан-проект'),
-        h('details',null,h('summary',null,'Фото на пачках'),...photoSources.map(([title,url])=>h('a',{key:url,href:url},title)))));
+        h('details',null,h('summary',null,'Фото для иллюстраций'),...photoSources.map(([title,url])=>h('a',{key:url,href:url},title)))));
   }
   return {Header,Home,Catalog};
 }

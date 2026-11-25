@@ -9,18 +9,21 @@ const editions = [
     description: 'Угольные треугольники из чёрной кукурузы. Сначала цедра красного апельсина, затем дымная паприка.',
     mascotPose: 'Ягуар глотает солнечную корону'
   },
-  {
-    id: 'siren', name: 'Друже Нори', price: 219, color: '#70e9d6', spiceLevel: 1,
-    description: 'Коралловые начос со свёклой, морской солью и хлопьями нори. Послевкусие кислого юдзу.',
-    mascotPose: 'Поднимает волну перламутровой пеной'
-  },
-  {
-    id: 'volt', name: 'ВилсаХруст', price: 209, color: '#ffdc42', spiceLevel: 3,
-    description: 'Синие кукурузные чипсы с маринованной грушей. Зернистая горчица хрустит, имбирь щиплет язык.',
-    mascotPose: 'Саламандра ловит молнию'
-  }
 ];
 export const limitedDrops = editions.map(item => ({
   ...item, weight:'100 г', category:'лимитированные',
-  image:new URL('../images/fan-' + ({sus:'sus', eclipse:'a4', siren:'obl', volt:'wyl'})[item.id] + '.webp', import.meta.url).href
+  image:new URL('../images/drop-' + ({sus:'sus', eclipse:'a4'})[item.id] + '.webp', import.meta.url).href
+}));
+
+const everyday = [
+  ['cheese','Сырный хруст','Выдержанный сыр и тонкие золотистые ломтики.','#ffbd36'],
+  ['cream','Сметана и зелень','Нежная сметана, укроп и немного зелёного лука.','#a3e466'],
+  ['crab','Краб','Сладковатый вкус краба с морской солью.','#ff847d'],
+  ['tomato','Томат и паприка','Спелые томаты и дымная сладкая паприка.','#ff735e'],
+  ['salt','Морская соль','Тонкий картофельный ломтик и хрустящие кристаллы соли.','#7ddcff'],
+  ['bacon','Бекон и лук','Копчёный бекон и сладкий жареный лук.','#ffac66']
+];
+export const everydayChips = everyday.map(([id,name,description,color])=>({
+  id,name,description,color,category:'классические',weight:'100 г',price:139,spiceLevel:0,
+  image:new URL('../images/drop-'+id+'.webp', import.meta.url).href
 }));

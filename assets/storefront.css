@@ -60,3 +60,21 @@ body{background:#0c0a0e}
 @media(min-width:760px){.view-cases .club-box{display:grid;grid-template-columns:1fr 1.2fr;align-items:stretch}.view-cases .crate-art{height:100%;min-height:18rem}.view-upgrade .club-up{grid-template-columns:minmax(180px,.7fr) minmax(0,1fr);column-gap:clamp(2rem,6vw,5rem)}.view-upgrade .club-up>*{grid-column:2}.view-upgrade .club-up>.upgrade-dial{grid-column:1;grid-row:1/span 8;align-self:center;width:min(94%,290px)}}
 #root main.pt-20 {padding-top:clamp(1.25rem,3vw,2.5rem)}
 #map iframe {max-width:100%}
+.club-page .club-machines{max-width:900px;margin:auto;display:grid;grid-template-columns:minmax(0,1fr)}
+.club-page .club-box,.club-page .club-up{display:block;text-align:center}
+.club-page .view-upgrade .club-box,.club-page .view-cases .club-up{display:none}
+.club-controls{justify-items:center}.club-controls .drop-reel,.crate-grid{width:100%}
+.crate-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem}
+.crate-grid button,.chip-picker button{min-width:0;background:#211a27;border:1px solid #514459;border-radius:12px;padding:.65rem;cursor:pointer}
+.crate-grid button{background:radial-gradient(ellipse at bottom,color-mix(in srgb,var(--accent) 23%,#171119),#171119 80%)}
+.crate-grid button[aria-pressed=true],.chip-picker button[aria-pressed=true]{outline:2px solid #ceff40;outline-offset:-2px}
+.crate-grid strong,.crate-grid small,.chip-picker small{display:block}
+.crate-stack{display:flex;align-items:center;justify-content:center;height:75px;margin-bottom:.4rem}
+.crate-stack img{width:33%;height:58px;object-fit:contain;transform:rotate(-11deg)}.crate-stack img:nth-child(2){z-index:1;transform:scale(1.16);margin-inline:-12%}.crate-stack img:nth-child(3){transform:rotate(11deg)}
+.club-page .club-up{max-width:720px;margin:auto;width:100%}.club-up>*{margin:0 auto 1rem}.club-up .club-balance{max-width:280px}.club-up .club-switch,.game-jumps{justify-content:center}.club-up>.upgrade-dial{margin:1.4rem auto;width:min(52vw,215px)}
+.club-wrap>h1{text-align:center}.chip-picker{min-width:0}.chip-picker legend{font-weight:800;margin:0 auto .6rem}.chip-picker>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(9rem,100%),1fr));gap:.5rem;max-height:240px;overflow:auto;padding:3px}
+.chip-picker button{display:flex;align-items:center;text-align:left;gap:.5rem}.chip-picker img{width:40px;height:52px;object-fit:contain}.chip-picker span{font-size:.86rem;font-weight:700}.club-page .club-result:not(:empty){max-width:650px;margin:1rem auto;background:radial-gradient(ellipse at left,#50215b,#1e1925 70%);border-color:#a277bd;padding:1rem;animation:pack-reveal .45s ease-out both}.club-result strong{font-size:1.4rem}.club-result img{height:6rem;box-shadow:0 0 20px #b37aef66}
+@keyframes pack-reveal{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+@media(max-width:600px){.crate-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.crate-stack{height:55px}.crate-stack img{height:46px}}
+@media(prefers-reduced-motion:reduce){.club-page .club-result:not(:empty){animation:none}}
+.pack-card>img[src*="/drop-"],.hero-packs img[src*="/drop-"]{object-fit:contain;background:#100e11}

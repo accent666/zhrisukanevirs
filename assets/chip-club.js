@@ -2,14 +2,20 @@ export const limitedChip = {
   id: 'lit', name: 'LITЖрисука', category: 'лимитированные', price: 199, weight: '100 г',
   description: 'Фиолетовая кукуруза, чёрная смородина и кислый лайм в фанатской серии с Михаилом Литвиным.',
   color: '#ff83dc', spiceLevel: 2, mascotPose: 'Светится в ультрафиолете',
-  image: new URL('../images/fan-lit.webp', import.meta.url).href
+  image: new URL('../images/drop-lit.webp', import.meta.url).href
 };
 
 const picture = name => new URL('../images/' + name + '.webp', import.meta.url).href;
 const cases = [
-  {name: 'Огненный', ids: ['dragon', 'mushroom', 'mango', 'cheddar', 'troll']},
-  {name: 'Орбитальный', ids: ['kraken', 'alien', 'shark', 'wasabi', 'lit']},
-  {name: 'Подземный', ids: ['sus', 'eclipse', 'siren', 'volt', 'lit']}
+  {name:'Классический', ids:['cheese','cream','crab','tomato','salt','bacon']},
+  {name:'Огненный', ids:['dragon','mushroom','mango','cheddar']},
+  {name:'Подземный', ids:['sus','lit','eclipse']},
+  {name:'Мясной', ids:['troll','bacon']},
+  {name:'Морской', ids:['crab','kraken','shark','salt']},
+  {name:'Орбитальный', ids:['alien','wasabi','mango']},
+  {name:'Сырная лавка', ids:['cheese','cheddar','troll','shark']},
+  {name:'Огород', ids:['tomato','cream','mushroom','wasabi']}
+
 ];
 const ranks = ['Классика', 'Неон', 'Хром', 'Ультра'];
 const empty = () => ({crumbs: 0, chips: {}});
@@ -140,7 +146,7 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
         next.chips[id] ||= {count:0, rank:0};
         next.chips[id].count += 1;
         next.crumbs += 1;
-      }, (key, duration) => setReel({key, duration, strip}), () => ({id, text:'Из кейса выпал вкус «' + product(id).name + '». +1 крошка.'}));
+      }, (key, duration) => setReel({key, duration, strip}), () => ({id, text:'Из кейса «' + box.name + '» · +1 пачка и +1 крошка.'}));
     }
 
     function upgrade() {
@@ -162,18 +168,22 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
     return h(React.Fragment, null,
       h('div', {className:'club-machines view-'+view},
         h('section', {className:'club-box', id:'cases'},
-          h('img', {className:'crate-art', src:picture('crate'), alt:'Кейс с неоновыми замками'}),
           h('div', {className:'club-controls'},
-            h('h2', null, 'Открыть кейс'),
-            h('div', {className:'club-switch'}, ...cases.map((item,i) =>
-              h('button', {key:item.name, disabled:busy, onClick:()=>{setCase(i); setReel(null);}, 'aria-pressed':caseIndex===i}, item.name))),
+            h('h2',null,'Выбери кейс'),
+            h('div',{className:'crate-grid'},...cases.map((item,i)=>h('button',{
+              key:item.name, disabled:busy, 'aria-pressed':caseIndex===i,
+              style:{'--accent':product(item.ids[0]).color},
+              onClick:()=>{setCase(i);setReel(null);show(null);}},
+              h('div',{className:'crate-stack'},...item.ids.slice(0,3).map(id=>h('img',{key:id,src:product(id).image,alt:''}))),
+              h('strong',null,item.name),h('small',null,'Вкусов: '+item.ids.length)))),
+            h('h3',null,'Кейс «'+box.name+'»'),
             h('div', {className:'drop-reel', 'aria-hidden':true},
               h('div', {key:reel?.key ?? box.name, className:reel ? 'drop-track rolling' : 'drop-track',
                 style:{'--travel':(-winnerSlot * 86 - 40) + 'px', '--run':(reel?.duration || 0) + 'ms'}},
                 ...(reel?.strip || [...box.ids,...box.ids]).map((id,index) =>
                   h('div', {key:index, className:'drop-slot', 'data-chip':id,
                     style:{'--glow':product(id).color}}, h('img', {src:product(id).image, alt:''}))))),
-            h('p', null, 'Пять вкусов с равным шансом. За открытие — одна крошка.'),
+            h('p', null, 'У всех вкусов в кейсе равный шанс. За открытие — одна крошка.'),
             h('details', null, h('summary', null, 'Что внутри'), h('p', null, box.ids.map(id => product(id).name).join(' · '))),
             h('button', {className:'club-action', disabled:busy || !album, onClick:openCase}, 'Открыть бесплатно'))),
         h('section', {className:'club-up', id:'upgrade'},
@@ -186,9 +196,10 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
               className:wheel ? 'dial-arm spinning' : 'dial-arm',
               style:{'--angle':(1440 + (wheel?.angle ?? 0))+'deg', '--run':(wheel?.duration || 0)+'ms'}})),
           target ? h(React.Fragment, null,
-            h('label', null, 'Вкус из коллекции', h('select', {value:target.id, disabled:busy,
-              onChange:e=>{select(e.target.value);setWheel(null);}},
-              ...owned.map(item=>h('option', {key:item.id,value:item.id}, item.name)))),
+            h('fieldset',{className:'chip-picker'},h('legend',null,'Выбери пачку из коллекции'),
+              h('div',null,...owned.map(item=>h('button',{key:item.id,disabled:busy,'aria-pressed':item.id===target.id,
+                onClick:()=>{select(item.id);setWheel(null);show(null);}},
+                h('img',{src:item.image,alt:''}),h('span',null,item.name,h('small',null,ranks[items[item.id].rank]+' · ×'+items[item.id].count)))))),
             h('div', {className:'club-switch', role:'group', 'aria-label':'Шанс улучшения'},
               ...modes.map((option,i)=>h('button',{key:option.chance, disabled:busy || rank===3,
                 'aria-pressed':modeIndex===i, onClick:()=>{setMode(i);setWheel(null);}},option.chance+'%'))),
@@ -198,7 +209,7 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
               rank===3 ? 'Максимальный ранг' : 'Улучшить за ' + cost + ' кр.'))
             : h('p', {className:'club-tip'}, 'Открой первый кейс, чтобы выбрать чипсы.'))),
       h('div', {role:'status', className:'club-result'}, result && h(React.Fragment, null,
-        h('img', {src:product(result.id).image, alt:''}), h('span', null,result.text))),
+        h('img', {src:product(result.id).image, alt:''}), h('div',null,h('strong',null,product(result.id).name),h('p',null,result.text)))),
       error && h('p', {role:'alert'}, error),
       h('section', {className:'club-album'},
         h('header', null, h('h2', null, 'Альбом вкусов'), h('span', null, owned.length + ' / ' + products.length)),

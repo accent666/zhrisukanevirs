@@ -1,8 +1,8 @@
 export const limitedChip = {
   id: 'lit', name: 'LITЖрисука', category: 'лимитированные', price: 199, weight: '100 г',
-  description: 'Фиолетовая кукуруза, чёрная смородина и кислый лайм в голографической пачке.',
+  description: 'Фиолетовая кукуруза, чёрная смородина и кислый лайм в фанатской серии с Михаилом Литвиным.',
   color: '#ff83dc', spiceLevel: 2, mascotPose: 'Светится в ультрафиолете',
-  image: new URL('../images/lit.webp', import.meta.url).href
+  image: new URL('../images/fan-lit.webp', import.meta.url).href
 };
 
 const picture = name => new URL('../images/' + name + '.webp', import.meta.url).href;
@@ -51,7 +51,7 @@ async function albumFor(owner, change) {
   });
 }
 
-export function createClub(React, products, useAccount, useCart) {
+export function createClub(React, products, useAccount, useCart, useLocation, Link) {
   const h = React.createElement;
   const {useState, useEffect, useRef} = React;
   const product = id => products.find(item => item.id === id);
@@ -73,14 +73,19 @@ export function createClub(React, products, useAccount, useCart) {
   }
 
   function Workshop() {
+    const {hash} = useLocation();
+    const view = hash === "#upgrade" ? "upgrade" : hash === "#cases" ? "cases" : "both";
     const {user, restoring} = useAccount();
     const owner = user ? 'account:' + user.email : 'guest';
     return h('main', {className:'club-page'}, h('div', {className:'club-wrap'},
       h('h1', null, 'Кейсы и апгрейдер'),
-      restoring ? h('p', null, 'Открываем коллекцию…') : h(Album, {key:owner, owner})));
+      h('nav',{className:'game-jumps','aria-label':'Режим игрового клуба'},
+        h(Link,{to:'/club/#cases','aria-current':view==='cases'?'page':undefined},'Кейсы'),
+        h(Link,{to:'/club/#upgrade','aria-current':view==='upgrade'?'page':undefined},'Апгрейдер')),
+      restoring ? h('p', null, 'Открываем коллекцию…') : h(Album, {key:owner, owner, view})));
   }
 
-  function Album({owner}) {
+  function Album({owner, view}) {
     const [album, setAlbum] = useState(null);
     const [caseIndex, setCase] = useState(0);
     const [selected, select] = useState('');
@@ -155,8 +160,8 @@ export function createClub(React, products, useAccount, useCart) {
     }
 
     return h(React.Fragment, null,
-      h('div', {className:'club-machines'},
-        h('section', {className:'club-box'},
+      h('div', {className:'club-machines view-'+view},
+        h('section', {className:'club-box', id:'cases'},
           h('img', {className:'crate-art', src:picture('crate'), alt:'Кейс с неоновыми замками'}),
           h('div', {className:'club-controls'},
             h('h2', null, 'Открыть кейс'),
@@ -171,7 +176,7 @@ export function createClub(React, products, useAccount, useCart) {
             h('p', null, 'Пять вкусов с равным шансом. За открытие — одна крошка.'),
             h('details', null, h('summary', null, 'Что внутри'), h('p', null, box.ids.map(id => product(id).name).join(' · '))),
             h('button', {className:'club-action', disabled:busy || !album, onClick:openCase}, 'Открыть бесплатно'))),
-        h('section', {className:'club-up'},
+        h('section', {className:'club-up', id:'upgrade'},
           h('div', {className:'club-balance'}, 'Крошки ', h('strong', null, album?.crumbs ?? '…')),
           h('h2', null, 'Апгрейдер'), h('p', null, 'Выбери вкус и потрать крошки, чтобы поднять его ранг.'),
           h('div', {className:'upgrade-dial', style:{'--arc':mode.chance+'%'}},

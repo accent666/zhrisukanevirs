@@ -7,14 +7,14 @@ export const limitedChip = {
 
 const picture = name => new URL('../images/' + name + '.webp', import.meta.url).href;
 const cases = [
-  {name:'Классический', slug:'classic', ids:['cheese','cream','crab','tomato','salt','bacon']},
-  {name:'Огненный', slug:'fire', ids:['dragon','mushroom','mango','cheddar']},
-  {name:'Подземный', slug:'underground', ids:['sus','lit','eclipse']},
-  {name:'Мясной', slug:'meat', ids:['troll','bacon']},
-  {name:'Морской', slug:'sea', ids:['crab','kraken','shark','salt']},
-  {name:'Орбитальный', slug:'orbit', ids:['alien','wasabi','mango']},
-  {name:'Сырная лавка', slug:'cheese', ids:['cheese','cheddar','troll','shark']},
-  {name:'Огород', slug:'garden', ids:['tomato','cream','mushroom','wasabi']}
+  {name:'Классика чипсов', slug:'classic', ids:['cheese','cream','crab','tomato','salt','bacon']},
+  {name:'Острые перцы', slug:'fire', ids:['dragon','mushroom','mango','cheddar']},
+  {name:'Блогерские лимитки', slug:'underground', ids:['sus','lit','eclipse']},
+  {name:'Бекон и BBQ', slug:'meat', ids:['troll','bacon']},
+  {name:'Морские вкусы', slug:'sea', ids:['crab','kraken','shark','salt']},
+  {name:'Фрукты и васаби', slug:'orbit', ids:['alien','wasabi','mango']},
+  {name:'Сырное ассорти', slug:'cheese', ids:['cheese','cheddar','troll','shark']},
+  {name:'Зелень и овощи', slug:'garden', ids:['tomato','cream','mushroom','wasabi']}
 
 ];
 const ranks = ['Классика', 'Неон', 'Хром', 'Ультра'];
@@ -107,7 +107,7 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
   }
 
   function Cart() {
-    const {items,isCartOpen,setIsCartOpen,totalPrice,updateQuantity}=useCart();
+    const {items,isCartOpen,setIsCartOpen,totalPrice,updateQuantity,addToCart}=useCart();
     const prizes=usePrizes();
     const ref=useRef(null);
     const close=()=>setIsCartOpen(false);
@@ -126,16 +126,15 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
         h('header',null,h('h2',{id:'cart-title'},'Корзина'),h('button',{onClick:close,'aria-label':'Закрыть корзину'},'×')),
         h('div',{className:'cart-lines'},
           !prizes && h('p',null,'Загружаем пачки…'),
-          prizes?.error && h('p',{role:'alert'},'Не удалось загрузить выигрыши.'),
-          prizes?.chips && !rows.length && h('p',null,'Корзина пуста. Выбери вкус в каталоге или открой кейс.'),
+          prizes?.error && h('p',{role:'alert'},'Не удалось загрузить товары.'),
+          prizes?.chips && !rows.length && h('p',null,'Корзина пуста. Выбери вкус в каталоге.'),
           ...rows.map(({product:p,paid,prize})=>h('article',{key:p.id},
             h('img',{src:p.image,alt:''}),
             h('div',null,h('h3',null,p.name),
-              prize && h('div',{className:'cart-prize'},h('small',null,'Из кейсов · ×'+prize.count+' · '+ranks[prize.rank]),
-                h(Link,{to:'/club/?chip='+p.id+'#upgrade',onClick:close},'Улучшить →')),
-              paid>0 && h('div',{className:'cart-qty'},
-                h('button',{onClick:()=>updateQuantity(p.id,paid-1),'aria-label':'Уменьшить '+p.name},'−'),
-                h('span',null,paid),h('button',{onClick:()=>updateQuantity(p.id,paid+1),'aria-label':'Увеличить '+p.name},'+'),
+              h('small',{className:'cart-pack-size'},p.weight,prize ? ' · '+prize.count+' шт. бесплатно' : ''),
+              h('div',{className:'cart-qty'},
+                h('button',{disabled:paid===0,onClick:()=>updateQuantity(p.id,paid-1),'aria-label':'Уменьшить '+p.name},'−'),
+                h('span',null,paid+(prize?.count || 0)),h('button',{onClick:()=>addToCart(p),'aria-label':'Увеличить '+p.name},'+'),
                 h('strong',null,paid*p.price+' ₽')))))),
         h('footer',null,items.length>0&&h(Link,{to:'/checkout',onClick:close,className:'acid-button'},'Оформить заказ · '+totalPrice+' ₽'),
           h('button',{onClick:close},'Продолжить покупки'))));
@@ -148,7 +147,7 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
     const {user, restoring} = useAccount();
     const owner = user ? 'account:' + user.email : 'guest';
     return h('main', {className:'club-page'}, h('div', {className:'club-wrap'},
-      view==='cases' && selectedCase && h(Link,{to:'/club/#cases',className:'product-back'},'← Все кейсы'),
+      view==='cases' && selectedCase && h(Link,{to:'/club/#cases',className:'product-back'},'Все кейсы'),
       h('h1', null, view==='upgrade'?'Апгрейдер':selectedCase?'Кейс «'+selectedCase.name+'»':'Кейсы'),
       view==='cases' && !selectedCase ? h('div',{className:'crate-grid case-gallery',id:'cases'},...cases.map(item=>
         h(Link,{key:item.slug,to:'/club/?case='+item.slug+'#cases',style:{'--accent':product(item.ids[0]).color}},
@@ -159,7 +158,6 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
   }
 
   function Album({owner, view, box}) {
-    const {setIsCartOpen}=useCart();
     const [album, setAlbum] = useState(null);
     const [selected, select] = useState('');
     const [result, show] = useState(null);
@@ -262,13 +260,12 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
                 onClick:()=>{select(item.id);setWheel(null);show(null);}},
                 h('img',{src:item.image,alt:''}),h('span',null,item.name,h('small',null,ranks[items[item.id].rank]+' · ×'+items[item.id].count)))))),
             h('small',null,'При попадании в лаймовый сектор ранг растёт. При промахе пачка остаётся у тебя.'),
-            h('div', {className:'club-rank'}, ranks[rank], rank < 3 && ' → ' + ranks[rank+1]),
+            h('div', {className:'club-rank'}, rank < 3 ? 'Следующий ранг: '+ranks[rank+1] : ranks[rank]),
             h('button', {className:'club-action', onClick:upgrade, disabled:busy || rank===3},
               rank===3 ? 'Максимальный ранг' : busy?'Прокрутка…':'Крутить'))
             : h('p', {className:'club-tip'}, 'Открой первый кейс, чтобы выбрать чипсы.'))),
       view==='upgrade' && reward,
-      error && h('p', {role:'alert'}, error),
-      result && h('button',{className:'outline-button',onClick:()=>setIsCartOpen(true)},'Открыть корзину'));
+      error && h('p', {role:'alert'}, error));
   }
   return {Workshop, Customers, Cart, usePrizes};
 }

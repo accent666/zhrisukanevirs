@@ -10,7 +10,6 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
   const {useState,useEffect}=React;
   const byId=id=>products.find(p=>p.id===id);
   const link=(to,label,cls)=>h(Link,{to,className:cls},label);
-  const image=name=>new URL('../images/'+name,import.meta.url).href;
   const games=[['/club/#cases','Кейсы'],['/club/#upgrade','Апгрейдер']];
   function Header() {
     const {pathname,hash,search}=useLocation();
@@ -44,11 +43,11 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
     return h('section',{className:'store-hero'},h('div',{className:'hero-copy'},
       h('h1',null,'Начос',h('br'),' из ',h('em',null,'бездны')),
       h('p',null,'Впился зубом — пропал рассудок!'),
-      h('div',{className:'hero-links'},link('/catalog','Выбрать вкус','acid-button'),link('/club/#cases','Открыть кейс','outline-button'),link('/club/#upgrade','Апгрейдер','outline-button'))),
+      h('div',{className:'hero-links'},link('/catalog','Выбрать вкус','acid-button'))),
       h(Link,{to:'/catalog?series=fan',className:'hero-packs','aria-label':'Открыть фанатскую серию'},
         h('img',{className:'pack-lit',src:byId('lit').image,alt:'LITЖрисука с Михаилом Литвиным',width:720,height:960}),
         h('img',{className:'pack-sus',src:byId('sus').image,alt:'ЖрисукаСус с Супер Сусом',width:720,height:960}),
-        h('span',null,'Фанатская серия ↗')));
+        h('span',null,'Фанатская серия')));
   }
   function Product({item, back}) {
     const {addToCart}=useCart();
@@ -57,7 +56,7 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
     const valid=Number.isInteger(quantity) && quantity>=1 && quantity<=99;
     useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});},[item.id]);
     return h('section',{className:'store-width product-page'},
-      link(back,'← Все вкусы','product-back'),
+      link(back,'Все вкусы','product-back'),
       h('div',{className:'product-layout'},
         h('img',{className:'product-photo',src:item.image,alt:item.name}),
         h('div',{className:'product-details'},
@@ -106,19 +105,13 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
         h('div',{className:'pack-body'},h('small',null,creators[p.id]?'Фан-серия / '+creators[p.id]:p.category+' / '+p.weight),h('h3',null,h(Link,{to:productUrl(p.id),className:'pack-detail-link'},p.name)),
           h('p',null,p.description),h('div',{className:'pack-buy'},h('strong',null,p.price+' ₽'),h('button',{onClick:()=>addToCart(p)},'В корзину')))))));
   }
-  function GameLinks(){
-    return h('section',{className:'store-width game-links'},h('h2',null,'Игровой клуб'),
-      h('div',null,...games.map(([to,label],i)=>h(Link,{to,key:to},
-        h('img',{src:i?byId('lit').image:image('crate.webp'),loading:'lazy',alt:''}),
-        h('div',null,h('h3',null,label),h('p',null,i?'Выбирай пачку из инвентаря и повышай её ранг.':'Открывай бесплатные кейсы и собирай вкусы.'))))));
-  }
   function Home(){
     const {hash}=useLocation();
     const [info,setInfo]=useState('');
     useEffect(()=>{if(['#wholesale','#map'].includes(hash))setInfo(hash.slice(1));},[hash]);
-    return h('main',null,h(Hero),h(GameLinks),h(Catalog),h('section',{className:'store-width store-info'},
+    return h('main',null,h(Hero),h(Catalog),h('section',{className:'store-width store-info'},
       h('h2',null,'Клуб и контакты'),
-      h('div',{className:'info-actions'},link('/customers','Наши постоянные покупатели ↗','outline-button'),
+      h('div',{className:'info-actions'},link('/customers','Наши постоянные покупатели','outline-button'),
         ...[['wholesale','Оптовикам'],['map','Где купить']].map(([id,label])=>h('button',{key:id,'aria-expanded':info===id,onClick:()=>setInfo(info===id?'':id)},label))),
       info==='wholesale'&&h(Wholesale),info==='map'&&h(MapSection)),
       h('footer',{className:'store-width store-foot',id:'footer'},h('span',null,'ЖРИСУКА · Фан-проект'),

@@ -105,7 +105,7 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
     return h('section',{className:'store-width game-links'},h('h2',null,'Игровой клуб'),
       h('div',null,...games.map(([to,label],i)=>h(Link,{to,key:to},
         h('img',{src:i?byId('lit').image:image('crate.webp'),loading:'lazy',alt:''}),
-        h('div',null,h('h3',null,label),h('p',null,i?'Повышай ранг собранных пачек за крошки.':'Открывай бесплатные кейсы и собирай вкусы.'))))));
+        h('div',null,h('h3',null,label),h('p',null,i?'Выбирай пачку из инвентаря и повышай её ранг.':'Открывай бесплатные кейсы и собирай вкусы.'))))));
   }
   function Home(){
     const {hash}=useLocation();

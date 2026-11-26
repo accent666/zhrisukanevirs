@@ -19,9 +19,17 @@ const cases = [
 ];
 const ranks = ['Классика', 'Неон', 'Хром', 'Ультра'];
 const empty = () => ({crumbs: 0, chips: {}});
-const modes = [
-  {chance:35, surcharge:0}, {chance:65, surcharge:1}, {chance:90, surcharge:3}
-];
+const upgradeChance = [90,65,35,0];
+const tiers = {2:[70,30],3:[55,30,15],4:[45,30,17,8],6:[33,25,18,12,8,4]};
+function dropFrom(box) {
+  let roll=random()*100;
+  const chances=tiers[box.ids.length];
+  for (let i=0;i<chances.length;i++) {
+    roll-=chances[i];
+    if (roll<0) return box.ids[i];
+  }
+  return box.ids[box.ids.length-1];
+}
 const motionMs = 2800;
 const winnerSlot = 28;
 const random = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
@@ -52,7 +60,10 @@ async function albumFor(owner, change) {
       try { change(album); store.put(album, owner); }
       catch (error) { failure = error; tx.abort(); }
     };
-    tx.oncomplete = () => resolve(album);
+    tx.oncomplete = () => {
+      if(change) window.dispatchEvent(new CustomEvent('chip-inventory',{detail:owner}));
+      resolve(album);
+    };
     tx.onabort = () => reject(failure || tx.error);
   });
 }
@@ -78,6 +89,39 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
                 h('button', {className:'club-action', onClick:()=>addToCart(limitedChip)}, 'В корзину · 199 ₽')))))));
   }
 
+  function Inventory({close}) {
+    const {user,restoring}=useAccount();
+    const owner=user?'account:'+user.email:'guest';
+    const [opened,setOpened]=useState(false);
+    const [snapshot,setSnapshot]=useState(null);
+    const [search,setSearch]=useState('');
+    useEffect(()=>{
+      if(!opened || restoring)return;
+      let active=true;
+      const load=()=>albumFor(owner).then(album=>{if(active)setSnapshot({owner,album});})
+        .catch(()=>{if(active)setSnapshot({owner,error:true});});
+      load();
+      window.addEventListener('chip-inventory',load);
+      window.addEventListener('focus',load);
+      return ()=>{active=false;window.removeEventListener('chip-inventory',load);window.removeEventListener('focus',load);};
+    },[opened,owner,restoring]);
+    const current=!restoring && snapshot?.owner===owner?snapshot:null;
+    const owned=products.filter(p=>current?.album?.chips[p.id]);
+    const list=owned.filter(p=>p.name.toLocaleLowerCase('ru').includes(search.trim().toLocaleLowerCase('ru')));
+    return h('div',{className:'inventory-area '+(opened?'inventory-open':'')},
+      h('div',{className:'inv-tabs'},...['Покупки','Инвентарь'].map((label,i)=>h('button',{
+        key:label,'aria-pressed':opened===Boolean(i),onClick:()=>setOpened(Boolean(i))},label))),
+      opened && h('section',null,h('h3',null,'Мои чипсы'),
+        !current?h('p',null,'Загрузка…'):current.error?h('p',null,'Не удалось загрузить инвентарь.'):
+        owned.length?h(React.Fragment,null,
+          h('input',{type:'search','aria-label':'Найти вкус',placeholder:'Найти вкус',value:search,onChange:e=>setSearch(e.target.value)}),
+          list.length===0&&h('p',null,'Такого вкуса нет.'),
+          ...list.map(p=>h(Link,{key:p.id,to:'/club/?chip='+p.id+'#upgrade',onClick:close,className:'inv-item'},
+            h('img',{src:p.image,alt:''}),h('span',null,h('strong',null,p.name),
+            h('small',null,ranks[current.album.chips[p.id].rank]+' · ×'+current.album.chips[p.id].count)),h('b',null,'→')))):
+          h(React.Fragment,null,h('p',null,'Здесь появятся пачки из кейсов.'),h(Link,{to:'/club/#cases',onClick:close},'Выбрать кейс →'))));
+  }
+
   function Workshop() {
     const {hash} = useLocation();
     const view = hash === "#upgrade" ? "upgrade" : hash === "#cases" ? "cases" : "both";
@@ -98,7 +142,10 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
     const [result, show] = useState(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
-    const [modeIndex, setMode] = useState(1);
+    const location=useLocation();
+    const [filter,setFilter]=useState('');
+    const requestedChip=new URLSearchParams(location.search).get('chip');
+    useEffect(()=>{if(requestedChip){select(requestedChip);setWheel(null);show(null);}},[requestedChip,location.key]);
     const [reel, setReel] = useState(null);
     const [wheel, setWheel] = useState(null);
     const round = useRef(0);
@@ -118,8 +165,7 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
     const owned = products.filter(item => items[item.id]);
     const target = owned.find(item => item.id === selected) || owned[0];
     const rank = target ? items[target.id].rank : 0;
-    const mode = modes[modeIndex];
-    const cost = rank + 1 + mode.surcharge;
+    const chance=upgradeChance[rank];
     const box = cases[caseIndex];
 
     async function mutate(edit, animate, message) {
@@ -139,26 +185,26 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
     }
 
     function openCase() {
-      const id = draw(box.ids);
-      const strip = Array.from({length:winnerSlot + 9}, () => draw(box.ids));
+      const id = dropFrom(box);
+      const strip = Array.from({length:winnerSlot + 9}, () => dropFrom(box));
       strip[winnerSlot] = id;
       mutate(next => {
         next.chips[id] ||= {count:0, rank:0};
         next.chips[id].count += 1;
-        next.crumbs += 1;
-      }, (key, duration) => setReel({key, duration, strip}), () => ({id, text:'Из кейса «' + box.name + '» · +1 пачка и +1 крошка.'}));
+
+      }, (key, duration) => setReel({key, duration, strip}), () => ({id, text:'Из кейса «' + box.name + '» · +1 пачка в инвентаре.'}));
     }
 
     function upgrade() {
       const id = target.id;
       const fraction = random();
-      const won = fraction < mode.chance / 100;
+      const won = fraction < chance / 100;
       const angle = fraction * 360;
       mutate(next => {
         const chip = next.chips[id];
-        if (chip.rank !== rank || rank >= ranks.length - 1 || next.crumbs < cost)
+        if (chip.rank !== rank || rank >= ranks.length - 1)
           throw new Error('Баланс изменился. Обнови страницу и выбери вкус ещё раз.');
-        next.crumbs -= cost;
+
         if (won) chip.rank += 1;
       }, (key, duration) => setWheel({key, duration, angle, id}),
         () => ({id, text:won ? target.name + ' получает ранг «' + ranks[rank + 1] + '».'
@@ -183,30 +229,27 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
                 ...(reel?.strip || [...box.ids,...box.ids]).map((id,index) =>
                   h('div', {key:index, className:'drop-slot', 'data-chip':id,
                     style:{'--glow':product(id).color}}, h('img', {src:product(id).image, alt:''}))))),
-            h('p', null, 'У всех вкусов в кейсе равный шанс. За открытие — одна крошка.'),
-            h('details', null, h('summary', null, 'Что внутри'), h('p', null, box.ids.map(id => product(id).name).join(' · '))),
-            h('button', {className:'club-action', disabled:busy || !album, onClick:openCase}, 'Открыть бесплатно'))),
+            h('ul',{className:'drop-odds','aria-label':'Шансы выпадения'},...box.ids.map((id,i)=>
+              h('li',{key:id},h('img',{src:product(id).image,alt:''}),h('span',null,product(id).name),h('strong',null,tiers[box.ids.length][i]+'%')))),
+            h('button', {className:'club-action', disabled:busy || !album, onClick:openCase}, busy?'Прокрутка…':'Крутить'))),
         h('section', {className:'club-up', id:'upgrade'},
-          h('div', {className:'club-balance'}, 'Крошки ', h('strong', null, album?.crumbs ?? '…')),
-          h('h2', null, 'Апгрейдер'), h('p', null, 'Выбери вкус и потрать крошки, чтобы поднять его ранг.'),
-          h('div', {className:'upgrade-dial', style:{'--arc':mode.chance+'%'}},
+          h('h2', null, 'Апгрейдер'), h('p', null, 'Выбери пачку из инвентаря. С каждым рангом шанс улучшения ниже.'),
+          h('div', {className:'upgrade-dial', style:{'--arc':chance+'%'}},
             h('div', {className:'dial-face'}, target && h('img',{src:target.image,alt:''}),
-              h('strong',null,mode.chance+'%'), h('small',null,'шанс улучшения')),
+              h('strong',null,rank===3?'MAX':chance+'%'), h('small',null,'шанс улучшения')),
             h('div', {key:wheel?.key ?? 'idle', 'aria-hidden':true,
               className:wheel ? 'dial-arm spinning' : 'dial-arm',
               style:{'--angle':(1440 + (wheel?.angle ?? 0))+'deg', '--run':(wheel?.duration || 0)+'ms'}})),
           target ? h(React.Fragment, null,
             h('fieldset',{className:'chip-picker'},h('legend',null,'Выбери пачку из коллекции'),
-              h('div',null,...owned.map(item=>h('button',{key:item.id,disabled:busy,'aria-pressed':item.id===target.id,
+              owned.length>4 && h('input',{type:'search',value:filter,'aria-label':'Поиск по инвентарю',placeholder:'Найти пачку',onChange:e=>setFilter(e.target.value)}),
+              h('div',null,...owned.filter(item=>item.name.toLowerCase().includes(filter.trim().toLowerCase())).map(item=>h('button',{key:item.id,disabled:busy,'aria-pressed':item.id===target.id,
                 onClick:()=>{select(item.id);setWheel(null);show(null);}},
                 h('img',{src:item.image,alt:''}),h('span',null,item.name,h('small',null,ranks[items[item.id].rank]+' · ×'+items[item.id].count)))))),
-            h('div', {className:'club-switch', role:'group', 'aria-label':'Шанс улучшения'},
-              ...modes.map((option,i)=>h('button',{key:option.chance, disabled:busy || rank===3,
-                'aria-pressed':modeIndex===i, onClick:()=>{setMode(i);setWheel(null);}},option.chance+'%'))),
-            h('small',null,'Попади стрелкой в лаймовый сектор. При промахе расходуются только крошки.'),
+            h('small',null,'При попадании в лаймовый сектор ранг растёт. При промахе пачка остаётся у тебя.'),
             h('div', {className:'club-rank'}, ranks[rank], rank < 3 && ' → ' + ranks[rank+1]),
-            h('button', {className:'club-action', onClick:upgrade, disabled:busy || rank===3 || album.crumbs<cost},
-              rank===3 ? 'Максимальный ранг' : 'Улучшить за ' + cost + ' кр.'))
+            h('button', {className:'club-action', onClick:upgrade, disabled:busy || rank===3},
+              rank===3 ? 'Максимальный ранг' : busy?'Прокрутка…':'Крутить'))
             : h('p', {className:'club-tip'}, 'Открой первый кейс, чтобы выбрать чипсы.'))),
       h('div', {role:'status', className:'club-result'}, result && h(React.Fragment, null,
         h('img', {src:product(result.id).image, alt:''}), h('div',null,h('strong',null,product(result.id).name),h('p',null,result.text)))),
@@ -220,5 +263,5 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
               h('small', null, chip ? ranks[chip.rank] + ' · ×' + chip.count : 'Ещё не открыт')));
         }))));
   }
-  return {Workshop, Customers};
+  return {Workshop, Customers, Inventory};
 }

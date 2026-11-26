@@ -45,6 +45,28 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
         h('img',{className:'pack-sus',src:byId('sus').image,alt:'ЖрисукаСус с Супер Сусом',width:720,height:960}),
         h('span',null,'Фанатская серия ↗')));
   }
+  function Product({item, back}) {
+    const {addToCart}=useCart();
+    const [value,setValue]=useState('1');
+    const quantity=Number(value);
+    const valid=Number.isInteger(quantity) && quantity>=1 && quantity<=99;
+    useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});},[item.id]);
+    return h('section',{className:'store-width product-page'},
+      link(back,'← Все вкусы','product-back'),
+      h('div',{className:'product-layout'},
+        h('img',{className:'product-photo',src:item.image,alt:item.name}),
+        h('div',{className:'product-details'},
+          h('small',null,creators[item.id]?'Фан-серия / '+creators[item.id]:item.category),
+          h('h1',null,item.name),h('p',null,item.description),
+          h('p',null,item.weight+' · '+item.price+' ₽ за пачку'),
+          h('form',{onSubmit:event=>{event.preventDefault();if(valid)addToCart(item,quantity);}},
+            h('label',{htmlFor:'pack-quantity'},'Количество пачек'),
+            h('div',{className:'quantity-stepper'},
+              h('button',{type:'button','aria-label':'Уменьшить количество',disabled:quantity<=1,onClick:()=>setValue(String(valid?quantity-1:1))},'−'),
+              h('input',{id:'pack-quantity',type:'number',inputMode:'numeric',min:1,max:99,step:1,required:true,value,onChange:e=>setValue(e.target.value)}),
+              h('button',{type:'button','aria-label':'Увеличить количество',disabled:quantity>=99,onClick:()=>setValue(String(valid?quantity+1:1))},'+')),
+            h('button',{type:'submit',className:'acid-button',disabled:!valid},valid?'Купить · '+(item.price*quantity)+' ₽':'Купить')))));
+  }
   function Catalog(){
     const location=useLocation();
     const navigate=useNavigate();
@@ -59,6 +81,16 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
       navigate({pathname:location.pathname,search:params.toString(),hash:location.hash},{replace:true,preventScrollReset:true});
     }
     const {addToCart}=useCart();
+    const detail=byId(params.get('product'));
+    const catalogParams=new URLSearchParams(params);
+    catalogParams.delete('product');
+    const back='/catalog/'+(catalogParams.size?'?'+catalogParams:'');
+    if(detail)return h(Product,{key:detail.id,item:detail,back});
+    function productUrl(id){
+      const search=new URLSearchParams(catalogParams);
+      search.set('product',id);
+      return '/catalog/?'+search;
+    }
     const sorted=['sus','lit','eclipse',...products.filter(p=>p.category==='классические').map(p=>p.id),...products.filter(p=>!creators[p.id] && p.category!=='классические').map(p=>p.id)].map(byId);
     const visible=filter==='all'?sorted:sorted.filter(p=>p.category===filter);
     return h('section',{className:'store-catalog store-width',id:'catalog'},
@@ -66,7 +98,7 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
       h('div',{className:'filter-row',role:'group','aria-label':'Фильтр вкусов'},...filters.map(([id,label])=>h('button',{key:id,type:'button','aria-pressed':filter===id,onClick:()=>setFilter(id)},label))),
       h('div',{className:'pack-grid'},...visible.map(p=>h('article',{key:p.id,className:'den-catalog-card pack-card',style:{'--ink':p.color}},
         h('img',{src:p.image,alt:p.name,loading:'lazy',decoding:'async',width:480,height:640}),
-        h('div',{className:'pack-body'},h('small',null,creators[p.id]?'Фан-серия / '+creators[p.id]:p.category+' / '+p.weight),h('h3',null,p.name),
+        h('div',{className:'pack-body'},h('small',null,creators[p.id]?'Фан-серия / '+creators[p.id]:p.category+' / '+p.weight),h('h3',null,h(Link,{to:productUrl(p.id),className:'pack-detail-link'},p.name)),
           h('p',null,p.description),h('div',{className:'pack-buy'},h('strong',null,p.price+' ₽'),h('button',{onClick:()=>addToCart(p)},'В корзину')))))));
   }
   function GameLinks(){

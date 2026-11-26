@@ -12,7 +12,7 @@ const editions = [
 ];
 export const limitedDrops = editions.map(item => ({
   ...item, weight:'100 г', category:'лимитированные',
-  image:new URL('../images/drop-' + ({sus:'sus', eclipse:'a4'})[item.id] + '.webp', import.meta.url).href
+  image:new URL('../images/drop-' + ({sus:'sus-portrait', eclipse:'a4'})[item.id] + '.webp', import.meta.url).href
 }));
 
 const everyday = [

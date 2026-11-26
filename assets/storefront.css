@@ -122,3 +122,19 @@ body{background:#0c0a0e}
 .up-console{display:grid;justify-items:center;gap:12px}.up-console .upgrade-dial{width:min(90%,210px)}
 .up-presets button{padding:7px 8px;margin:2px}.up-console .club-action{width:100%}
 @media(max-width:760px){.up-board{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.up-console{grid-column:1/-1;grid-row:2}.up-picker>div{max-height:12rem}.up-picker button{font-size:.82rem}.up-picker img{width:30px;height:38px}.up-console .club-action{max-width:260px}}
+
+.pack-slot{min-width:0;text-align:left}
+.pack-slot>small{display:block;margin:0 0 .5rem;color:#e4cfea;font-weight:700}
+.pack-slot button,.upgrade-list button{display:flex;align-items:center;gap:.65rem;width:100%;min-width:0;background:#211625;color:white;border:1px solid #694773;border-radius:12px;padding:.65rem;text-align:left}
+.pack-slot button:disabled{opacity:.66}.pack-slot img,.upgrade-list img{width:46px;height:56px;object-fit:cover;border-radius:6px}
+.pack-slot span,.upgrade-list span{min-width:0;flex:1}.pack-slot strong,.upgrade-list strong{display:block;line-height:1.2}.pack-slot span small,.upgrade-list small{display:block;color:#d3bad9;font-size:.78rem}
+.pack-slot b,.upgrade-list b{color:#d0ff38;font-size:.8rem}
+.upgrade-sheet{position:fixed;inset:0;margin:auto;width:min(480px,94vw);max-height:80dvh;padding:0;border:1px solid #785283;border-radius:16px;background:#18101c;color:white;text-align:left}
+.upgrade-sheet::backdrop{background:#0d0712cc}
+.upgrade-sheet>div{display:flex;flex-direction:column;max-height:inherit}
+.upgrade-sheet header{display:flex;justify-content:space-between;align-items:center;padding:.75rem 1rem}
+.upgrade-sheet header h2{font-size:1.2rem;margin:0}
+.upgrade-sheet header button{color:white;background:#38213f;border-radius:9px;width:44px;height:44px;font-size:1.5rem}
+.upgrade-list{display:grid;gap:6px;overflow-y:auto;overscroll-behavior:contain;padding:0 12px 12px}
+.upgrade-list button[aria-pressed=true]{border-color:#cfff38}
+@media(max-width:760px){.up-board{grid-template-columns:minmax(0,1fr)}.pack-slot{grid-column:1}.up-console{grid-row:3}.pack-slot button{min-height:68px}.pack-slot img{width:38px;height:44px}.upgrade-sheet{inset:auto 0 0;margin:0;width:100%;max-width:none;max-height:74dvh;border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom)}}

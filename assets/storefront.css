@@ -108,3 +108,17 @@ body{background:#0c0a0e}
 .case-gallery strong{font-size:clamp(.94rem,1.6vw,1.14rem);text-wrap:balance}
 
 .product-photo{width:auto;max-width:100%;height:auto;justify-self:center}
+
+.club-page .view-upgrade,.club-page .view-upgrade .club-up{max-width:1100px;width:100%}
+.up-board{display:grid;grid-template-columns:minmax(0,1fr) minmax(205px,.85fr) minmax(0,1fr);align-items:start;gap:clamp(12px,2vw,28px)}
+.up-board fieldset{min-width:0;margin:0;padding:0;border:0}
+.up-board legend{font-weight:800;margin-bottom:.55rem;color:#ffebff}
+.up-picker>div{display:grid;align-content:start;gap:6px;max-height:28rem;overflow:auto;padding:3px;scrollbar-color:#76547e transparent}
+.up-picker button,.up-presets button{background:#27192e;color:white;border:1px solid #705278;border-radius:10px;font:inherit;font-weight:700}
+.up-board button[aria-pressed=true]{border-color:#d0ff38;background:#30351e;color:#e5ff96}
+.up-picker button{display:flex;align-items:center;text-align:left;gap:9px;padding:5px;line-height:1.15}
+.up-picker img{width:42px;height:48px;object-fit:cover;border-radius:6px}
+.up-picker small,.up-console>small{display:block;font-size:.76rem;color:#e1d4e5;font-weight:500;margin-top:4px}
+.up-console{display:grid;justify-items:center;gap:12px}.up-console .upgrade-dial{width:min(90%,210px)}
+.up-presets button{padding:7px 8px;margin:2px}.up-console .club-action{width:100%}
+@media(max-width:760px){.up-board{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.up-console{grid-column:1/-1;grid-row:2}.up-picker>div{max-height:12rem}.up-picker button{font-size:.82rem}.up-picker img{width:30px;height:38px}.up-console .club-action{max-width:260px}}

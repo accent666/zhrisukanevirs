@@ -17,9 +17,9 @@ const cases = [
   {name:'Зелень и овощи', slug:'garden', ids:['tomato','cream','mushroom','wasabi']}
 
 ];
-const ranks = ['Классика', 'Неон', 'Хром', 'Ультра'];
+const chances = [15, 35, 50, 75];
+const multipliers = [2, 3, 4];
 const empty = () => ({crumbs: 0, chips: {}});
-const upgradeChance = [90,65,35,0];
 const tiers = {2:[70,30],3:[55,30,15],4:[45,30,17,8],6:[33,25,18,12,8,4]};
 function dropFrom(box) {
   let roll=random()*100;
@@ -182,17 +182,25 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
       return () => { cancelled = true; active.current = false; window.removeEventListener('focus', refresh); };
     }, [owner]);
     const items = album?.chips || {};
-    const owned = products.filter(item => items[item.id]);
-    const target = owned.find(item => item.id === selected) || owned[0];
-    const rank = target ? items[target.id].rank : 0;
-    const chance=upgradeChance[rank];
+    const cart = useCart();
+    const [chance, setChance] = useState(50);
+    const [copies, setCopies] = useState(2);
+    const [desired, setDesired] = useState('');
+    const paid = id => cart.items.find(row => row.product.id === id)?.quantity || 0;
+    const quantity = id => paid(id) + (items[id]?.count || 0);
+    const owned = products.filter(p => quantity(p.id) > 0);
+    const source = owned.find(p => p.id === selected) || owned[0];
+    const options = products.filter(p => !source || p.price * copies > source.price);
+    const target = options.find(p => p.id === desired) || options[0];
 
-    async function mutate(edit, animate, message) {
+    async function mutate(edit, animate, message, refund) {
       if (locked.current || !album) return;
       locked.current = true;
       setBusy(true); setError(''); show(null);
       try {
-        const next = await albumFor(owner, edit);
+        let next;
+        try { next = await albumFor(owner, edit); }
+        catch (failure) { refund?.(); throw failure; }
         if (!active.current) return;
         const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : motionMs;
         animate(++round.current, duration);
@@ -215,19 +223,38 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
     }
 
     function upgrade() {
-      const id = target.id;
+      if (!source || !target || locked.current || !album) return;
+      const fromCart = !items[source.id]?.count;
       const fraction = random();
-      const won = fraction < chance / 100;
-      const angle = fraction * 360;
+      const won = fraction * 100 < chance;
+      if (fromCart) cart.updateQuantity(source.id, paid(source.id) - 1);
       mutate(next => {
-        const chip = next.chips[id];
-        if (chip.rank !== rank || rank >= ranks.length - 1)
-          throw new Error('Баланс изменился. Обнови страницу и выбери вкус ещё раз.');
+        if (!fromCart) {
+          const stake = next.chips[source.id];
+          if (!stake?.count) throw new Error('Этой пачки уже нет в корзине.');
+          if (--stake.count === 0) delete next.chips[source.id];
+        }
+        if (won) {
+          next.chips[target.id] ||= {count:0};
+          next.chips[target.id].count += copies;
+        }
+      }, (key, duration) => setWheel({key, duration, angle:fraction * 360}),
+        () => ({id:won ? target.id : source.id, text:won ? 'В корзину добавлено: ' + copies + ' шт.' : 'Промах. Ставка в одну пачку списана.'}),
+        fromCart ? () => cart.addToCart(source, 1, false) : undefined);
+    }
 
-        if (won) chip.rank += 1;
-      }, (key, duration) => setWheel({key, duration, angle, id}),
-        () => ({id, text:won ? target.name + ' получает ранг «' + ranks[rank + 1] + '».'
-          : 'Стрелка вне сектора. Вкус и ранг сохранены.'}));
+    function choose(setter, value) {
+      setter(value); setWheel(null); show(null);
+    }
+    function presets(label, values, current, setter, format) {
+      return h('fieldset',{className:'up-presets'},h('legend',null,label),
+        ...values.map(n=>h('button',{key:n, disabled:busy,'aria-pressed':current===n,onClick:()=>choose(setter,n)},format(n))));
+    }
+    function picker(label, list, current, setter, detail) {
+      return h('fieldset',{className:'up-picker'},h('legend',null,label),
+        h('div',null,...list.map(p=>h('button',{key:p.id,disabled:busy,'aria-pressed':p.id===current?.id,onClick:()=>choose(setter,p.id)},
+          h('img',{src:p.image,alt:'',loading:'lazy'}),h('span',null,p.name,h('small',null,detail(p)))))),
+        !list.length && h('p',null,'Добавь пачку из каталога или открой кейс.'));
     }
 
     const reward=h('div', {role:'status', className:'club-result'}, result && h(React.Fragment, null,
@@ -247,23 +274,19 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
             h('ul',{className:'drop-odds','aria-label':'Шансы выпадения'},...box.ids.map((id,i)=>
               h('li',{key:id},h('img',{src:product(id).image,alt:''}),h('span',null,product(id).name),h('strong',null,tiers[box.ids.length][i]+'%')))))),
         h('section', {className:'club-up', id:'upgrade'},
-          h('p', null, 'Выбери пачку из корзины. С каждым рангом шанс улучшения ниже.'),
-          h('div', {className:'upgrade-dial', style:{'--arc':chance+'%'}},
-            h('div', {className:'dial-face'}, target && h('img',{src:target.image,alt:''}),
-              h('strong',null,rank===3?'MAX':chance+'%'), h('small',null,'шанс улучшения')),
-            h('div', {key:wheel?.key ?? 'idle', 'aria-hidden':true,
-              className:wheel ? 'dial-arm spinning' : 'dial-arm',
-              style:{'--angle':(1440 + (wheel?.angle ?? 0))+'deg', '--run':(wheel?.duration || 0)+'ms'}})),
-          target ? h(React.Fragment, null,
-            h('fieldset',{className:'chip-picker'},h('legend',null,'Выбери пачку из коллекции'),
-              h('div',null,...owned.map(item=>h('button',{key:item.id,disabled:busy,'aria-pressed':item.id===target.id,
-                onClick:()=>{select(item.id);setWheel(null);show(null);}},
-                h('img',{src:item.image,alt:''}),h('span',null,item.name,h('small',null,ranks[items[item.id].rank]+' · ×'+items[item.id].count)))))),
-            h('small',null,'При попадании в лаймовый сектор ранг растёт. При промахе пачка остаётся у тебя.'),
-            h('div', {className:'club-rank'}, rank < 3 ? 'Следующий ранг: '+ranks[rank+1] : ranks[rank]),
-            h('button', {className:'club-action', onClick:upgrade, disabled:busy || rank===3},
-              rank===3 ? 'Максимальный ранг' : busy?'Прокрутка…':'Крутить'))
-            : h('p', {className:'club-tip'}, 'Открой первый кейс, чтобы выбрать чипсы.'))),
+          view==='upgrade' && h('div',{className:'up-board'},
+            picker('Пачка из корзины',owned,source,select,p=>quantity(p.id)+' шт. в корзине'),
+            h('div',{className:'up-console'},
+              h('div', {className:'upgrade-dial',style:{'--arc':chance+'%'}},
+                h('div',{className:'dial-face'},target && h('img',{src:target.image,alt:''}),
+                  h('strong',null,chance+'%'),h('small',null,'шанс выигрыша')),
+                h('div',{key:wheel?.key ?? 'idle','aria-hidden':true,className:wheel?'dial-arm spinning':'dial-arm',
+                  style:{'--angle':(1440+(wheel?.angle ?? 0))+'deg','--run':(wheel?.duration || 0)+'ms'}})),
+              presets('Шанс выигрыша',chances,chance,setChance,n=>n+'%'),
+              presets('Пачек при выигрыше',multipliers,copies,setCopies,n=>'×'+n),
+              h('button',{className:'club-action',disabled:busy||!source||!target||!album,onClick:upgrade},busy?'Прокрутка…':'Крутить'),
+              h('small',null,'Ставка — 1 пачка. При промахе она сгорает.')),
+            picker('Хочу получить',options,target,setDesired,()=>copies+' шт. · шанс '+chance+'%')))),
       view==='upgrade' && reward,
       error && h('p', {role:'alert'}, error));
   }

@@ -7,14 +7,14 @@ export const limitedChip = {
 
 const picture = name => new URL('../images/' + name + '.webp', import.meta.url).href;
 const cases = [
-  {name:'Классический', ids:['cheese','cream','crab','tomato','salt','bacon']},
-  {name:'Огненный', ids:['dragon','mushroom','mango','cheddar']},
-  {name:'Подземный', ids:['sus','lit','eclipse']},
-  {name:'Мясной', ids:['troll','bacon']},
-  {name:'Морской', ids:['crab','kraken','shark','salt']},
-  {name:'Орбитальный', ids:['alien','wasabi','mango']},
-  {name:'Сырная лавка', ids:['cheese','cheddar','troll','shark']},
-  {name:'Огород', ids:['tomato','cream','mushroom','wasabi']}
+  {name:'Классический', slug:'classic', ids:['cheese','cream','crab','tomato','salt','bacon']},
+  {name:'Огненный', slug:'fire', ids:['dragon','mushroom','mango','cheddar']},
+  {name:'Подземный', slug:'underground', ids:['sus','lit','eclipse']},
+  {name:'Мясной', slug:'meat', ids:['troll','bacon']},
+  {name:'Морской', slug:'sea', ids:['crab','kraken','shark','salt']},
+  {name:'Орбитальный', slug:'orbit', ids:['alien','wasabi','mango']},
+  {name:'Сырная лавка', slug:'cheese', ids:['cheese','cheddar','troll','shark']},
+  {name:'Огород', slug:'garden', ids:['tomato','cream','mushroom','wasabi']}
 
 ];
 const ranks = ['Классика', 'Неон', 'Хром', 'Ультра'];
@@ -89,61 +89,83 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
                 h('button', {className:'club-action', onClick:()=>addToCart(limitedChip)}, 'В корзину · 199 ₽')))))));
   }
 
-  function Inventory({close}) {
+  function usePrizes() {
     const {user,restoring}=useAccount();
     const owner=user?'account:'+user.email:'guest';
-    const [opened,setOpened]=useState(false);
     const [snapshot,setSnapshot]=useState(null);
-    const [search,setSearch]=useState('');
     useEffect(()=>{
-      if(!opened || restoring)return;
+      if(restoring)return;
       let active=true;
-      const load=()=>albumFor(owner).then(album=>{if(active)setSnapshot({owner,album});})
+      const load=()=>albumFor(owner).then(album=>{if(active)setSnapshot({owner,chips:album.chips});})
         .catch(()=>{if(active)setSnapshot({owner,error:true});});
       load();
       window.addEventListener('chip-inventory',load);
       window.addEventListener('focus',load);
       return ()=>{active=false;window.removeEventListener('chip-inventory',load);window.removeEventListener('focus',load);};
-    },[opened,owner,restoring]);
-    const current=!restoring && snapshot?.owner===owner?snapshot:null;
-    const owned=products.filter(p=>current?.album?.chips[p.id]);
-    const list=owned.filter(p=>p.name.toLocaleLowerCase('ru').includes(search.trim().toLocaleLowerCase('ru')));
-    return h('div',{className:'inventory-area '+(opened?'inventory-open':'')},
-      h('div',{className:'inv-tabs'},...['Покупки','Инвентарь'].map((label,i)=>h('button',{
-        key:label,'aria-pressed':opened===Boolean(i),onClick:()=>setOpened(Boolean(i))},label))),
-      opened && h('section',null,h('h3',null,'Мои чипсы'),
-        !current?h('p',null,'Загрузка…'):current.error?h('p',null,'Не удалось загрузить инвентарь.'):
-        owned.length?h(React.Fragment,null,
-          h('input',{type:'search','aria-label':'Найти вкус',placeholder:'Найти вкус',value:search,onChange:e=>setSearch(e.target.value)}),
-          list.length===0&&h('p',null,'Такого вкуса нет.'),
-          ...list.map(p=>h(Link,{key:p.id,to:'/club/?chip='+p.id+'#upgrade',onClick:close,className:'inv-item'},
-            h('img',{src:p.image,alt:''}),h('span',null,h('strong',null,p.name),
-            h('small',null,ranks[current.album.chips[p.id].rank]+' · ×'+current.album.chips[p.id].count)),h('b',null,'→')))):
-          h(React.Fragment,null,h('p',null,'Здесь появятся пачки из кейсов.'),h(Link,{to:'/club/#cases',onClick:close},'Выбрать кейс →'))));
+    },[owner,restoring]);
+    return !restoring && snapshot?.owner===owner?snapshot:null;
+  }
+
+  function Cart() {
+    const {items,isCartOpen,setIsCartOpen,totalPrice,updateQuantity}=useCart();
+    const prizes=usePrizes();
+    const ref=useRef(null);
+    const close=()=>setIsCartOpen(false);
+    useEffect(()=>{
+      const dialog=ref.current;
+      if(isCartOpen && !dialog.open)dialog.showModal();
+      else if(!isCartOpen && dialog.open)dialog.close();
+    },[isCartOpen]);
+    const rows=products.map(product=>({
+      product, paid:items.find(row=>row.product.id===product.id)?.quantity || 0,
+      prize:prizes?.chips?.[product.id]
+    })).filter(row=>row.paid || row.prize);
+    return h('dialog',{ref,className:'one-cart','aria-labelledby':'cart-title',onCancel:close,
+      onClick:event=>{if(event.target===ref.current)close();}},
+      h('div',{className:'cart-shell'},
+        h('header',null,h('h2',{id:'cart-title'},'Корзина'),h('button',{onClick:close,'aria-label':'Закрыть корзину'},'×')),
+        h('div',{className:'cart-lines'},
+          !prizes && h('p',null,'Загружаем пачки…'),
+          prizes?.error && h('p',{role:'alert'},'Не удалось загрузить выигрыши.'),
+          prizes?.chips && !rows.length && h('p',null,'Корзина пуста. Выбери вкус в каталоге или открой кейс.'),
+          ...rows.map(({product:p,paid,prize})=>h('article',{key:p.id},
+            h('img',{src:p.image,alt:''}),
+            h('div',null,h('h3',null,p.name),
+              prize && h('div',{className:'cart-prize'},h('small',null,'Из кейсов · ×'+prize.count+' · '+ranks[prize.rank]),
+                h(Link,{to:'/club/?chip='+p.id+'#upgrade',onClick:close},'Улучшить →')),
+              paid>0 && h('div',{className:'cart-qty'},
+                h('button',{onClick:()=>updateQuantity(p.id,paid-1),'aria-label':'Уменьшить '+p.name},'−'),
+                h('span',null,paid),h('button',{onClick:()=>updateQuantity(p.id,paid+1),'aria-label':'Увеличить '+p.name},'+'),
+                h('strong',null,paid*p.price+' ₽')))))),
+        h('footer',null,items.length>0&&h(Link,{to:'/checkout',onClick:close,className:'acid-button'},'Оформить заказ · '+totalPrice+' ₽'),
+          h('button',{onClick:close},'Продолжить покупки'))));
   }
 
   function Workshop() {
-    const {hash} = useLocation();
-    const view = hash === "#upgrade" ? "upgrade" : hash === "#cases" ? "cases" : "both";
+    const {hash,search} = useLocation();
+    const selectedCase=cases.find(box=>box.slug===new URLSearchParams(search).get("case"));
+    const view = hash === "#upgrade" ? "upgrade" : "cases";
     const {user, restoring} = useAccount();
     const owner = user ? 'account:' + user.email : 'guest';
     return h('main', {className:'club-page'}, h('div', {className:'club-wrap'},
-      h('h1', null, 'Кейсы и апгрейдер'),
-      h('nav',{className:'game-jumps','aria-label':'Режим игрового клуба'},
-        h(Link,{to:'/club/#cases','aria-current':view==='cases'?'page':undefined},'Кейсы'),
-        h(Link,{to:'/club/#upgrade','aria-current':view==='upgrade'?'page':undefined},'Апгрейдер')),
-      restoring ? h('p', null, 'Открываем коллекцию…') : h(Album, {key:owner, owner, view})));
+      view==='cases' && selectedCase && h(Link,{to:'/club/#cases',className:'product-back'},'← Все кейсы'),
+      h('h1', null, view==='upgrade'?'Апгрейдер':selectedCase?'Кейс «'+selectedCase.name+'»':'Кейсы'),
+      view==='cases' && !selectedCase ? h('div',{className:'crate-grid case-gallery',id:'cases'},...cases.map(item=>
+        h(Link,{key:item.slug,to:'/club/?case='+item.slug+'#cases',style:{'--accent':product(item.ids[0]).color}},
+          h('div',{className:'crate-stack'},...item.ids.slice(0,3).map(id=>h('img',{key:id,src:product(id).image,alt:''}))),
+          h('strong',null,item.name),h('small',null,'Вкусов: '+item.ids.length)))):
+      restoring ? h('p',null,'Загрузка…') : h(Album,{key:owner+view+(selectedCase?.slug||''),owner,view,box:selectedCase||cases[0]})));
+
   }
 
-  function Album({owner, view}) {
+  function Album({owner, view, box}) {
+    const {setIsCartOpen}=useCart();
     const [album, setAlbum] = useState(null);
-    const [caseIndex, setCase] = useState(0);
     const [selected, select] = useState('');
     const [result, show] = useState(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const location=useLocation();
-    const [filter,setFilter]=useState('');
     const requestedChip=new URLSearchParams(location.search).get('chip');
     useEffect(()=>{if(requestedChip){select(requestedChip);setWheel(null);show(null);}},[requestedChip,location.key]);
     const [reel, setReel] = useState(null);
@@ -166,7 +188,6 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
     const target = owned.find(item => item.id === selected) || owned[0];
     const rank = target ? items[target.id].rank : 0;
     const chance=upgradeChance[rank];
-    const box = cases[caseIndex];
 
     async function mutate(edit, animate, message) {
       if (locked.current || !album) return;
@@ -192,7 +213,7 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
         next.chips[id] ||= {count:0, rank:0};
         next.chips[id].count += 1;
 
-      }, (key, duration) => setReel({key, duration, strip}), () => ({id, text:'Из кейса «' + box.name + '» · +1 пачка в инвентаре.'}));
+      }, (key, duration) => setReel({key, duration, strip}), () => ({id, text:'Из кейса «' + box.name + '» · +1 пачка в корзине.'}));
     }
 
     function upgrade() {
@@ -211,29 +232,24 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
           : 'Стрелка вне сектора. Вкус и ранг сохранены.'}));
     }
 
+    const reward=h('div', {role:'status', className:'club-result'}, result && h(React.Fragment, null,
+        h('img', {src:product(result.id).image, alt:''}), h('div',null,h('strong',null,product(result.id).name),h('p',null,result.text))));
     return h(React.Fragment, null,
       h('div', {className:'club-machines view-'+view},
         h('section', {className:'club-box', id:'cases'},
           h('div', {className:'club-controls'},
-            h('h2',null,'Выбери кейс'),
-            h('div',{className:'crate-grid'},...cases.map((item,i)=>h('button',{
-              key:item.name, disabled:busy, 'aria-pressed':caseIndex===i,
-              style:{'--accent':product(item.ids[0]).color},
-              onClick:()=>{setCase(i);setReel(null);show(null);}},
-              h('div',{className:'crate-stack'},...item.ids.slice(0,3).map(id=>h('img',{key:id,src:product(id).image,alt:''}))),
-              h('strong',null,item.name),h('small',null,'Вкусов: '+item.ids.length)))),
-            h('h3',null,'Кейс «'+box.name+'»'),
             h('div', {className:'drop-reel', 'aria-hidden':true},
               h('div', {key:reel?.key ?? box.name, className:reel ? 'drop-track rolling' : 'drop-track',
                 style:{'--travel':(-winnerSlot * 86 - 40) + 'px', '--run':(reel?.duration || 0) + 'ms'}},
                 ...(reel?.strip || [...box.ids,...box.ids]).map((id,index) =>
                   h('div', {key:index, className:'drop-slot', 'data-chip':id,
                     style:{'--glow':product(id).color}}, h('img', {src:product(id).image, alt:''}))))),
+            h('button',{className:'club-action case-spin',disabled:busy||!album,onClick:openCase},busy?'Прокрутка…':'Крутить'),
+            view==='cases' && reward,
             h('ul',{className:'drop-odds','aria-label':'Шансы выпадения'},...box.ids.map((id,i)=>
-              h('li',{key:id},h('img',{src:product(id).image,alt:''}),h('span',null,product(id).name),h('strong',null,tiers[box.ids.length][i]+'%')))),
-            h('button', {className:'club-action', disabled:busy || !album, onClick:openCase}, busy?'Прокрутка…':'Крутить'))),
+              h('li',{key:id},h('img',{src:product(id).image,alt:''}),h('span',null,product(id).name),h('strong',null,tiers[box.ids.length][i]+'%')))))),
         h('section', {className:'club-up', id:'upgrade'},
-          h('h2', null, 'Апгрейдер'), h('p', null, 'Выбери пачку из инвентаря. С каждым рангом шанс улучшения ниже.'),
+          h('p', null, 'Выбери пачку из корзины. С каждым рангом шанс улучшения ниже.'),
           h('div', {className:'upgrade-dial', style:{'--arc':chance+'%'}},
             h('div', {className:'dial-face'}, target && h('img',{src:target.image,alt:''}),
               h('strong',null,rank===3?'MAX':chance+'%'), h('small',null,'шанс улучшения')),
@@ -242,8 +258,7 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
               style:{'--angle':(1440 + (wheel?.angle ?? 0))+'deg', '--run':(wheel?.duration || 0)+'ms'}})),
           target ? h(React.Fragment, null,
             h('fieldset',{className:'chip-picker'},h('legend',null,'Выбери пачку из коллекции'),
-              owned.length>4 && h('input',{type:'search',value:filter,'aria-label':'Поиск по инвентарю',placeholder:'Найти пачку',onChange:e=>setFilter(e.target.value)}),
-              h('div',null,...owned.filter(item=>item.name.toLowerCase().includes(filter.trim().toLowerCase())).map(item=>h('button',{key:item.id,disabled:busy,'aria-pressed':item.id===target.id,
+              h('div',null,...owned.map(item=>h('button',{key:item.id,disabled:busy,'aria-pressed':item.id===target.id,
                 onClick:()=>{select(item.id);setWheel(null);show(null);}},
                 h('img',{src:item.image,alt:''}),h('span',null,item.name,h('small',null,ranks[items[item.id].rank]+' · ×'+items[item.id].count)))))),
             h('small',null,'При попадании в лаймовый сектор ранг растёт. При промахе пачка остаётся у тебя.'),
@@ -251,17 +266,9 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
             h('button', {className:'club-action', onClick:upgrade, disabled:busy || rank===3},
               rank===3 ? 'Максимальный ранг' : busy?'Прокрутка…':'Крутить'))
             : h('p', {className:'club-tip'}, 'Открой первый кейс, чтобы выбрать чипсы.'))),
-      h('div', {role:'status', className:'club-result'}, result && h(React.Fragment, null,
-        h('img', {src:product(result.id).image, alt:''}), h('div',null,h('strong',null,product(result.id).name),h('p',null,result.text)))),
+      view==='upgrade' && reward,
       error && h('p', {role:'alert'}, error),
-      h('section', {className:'club-album'},
-        h('header', null, h('h2', null, 'Альбом вкусов'), h('span', null, owned.length + ' / ' + products.length)),
-        h('div', {className:'club-shelf'}, ...products.map(item => {
-          const chip = items[item.id];
-          return h('article', {key:item.id, className:chip ? 'found' : ''},
-            h('img', {src:item.image, alt:'', loading:'lazy'}), h('div', null, h('h3', null, item.name),
-              h('small', null, chip ? ranks[chip.rank] + ' · ×' + chip.count : 'Ещё не открыт')));
-        }))));
+      result && h('button',{className:'outline-button',onClick:()=>setIsCartOpen(true)},'Открыть корзину'));
   }
-  return {Workshop, Customers, Inventory};
+  return {Workshop, Customers, Cart, usePrizes};
 }

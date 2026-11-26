@@ -5,7 +5,7 @@ const photoSources = [
   ['Михаил Литвин · 24СМИ','https://24smi.org/celebrity/100883-mikhail-litvin.html'],
   ['Влад А4 · Узнай Всё','https://uznayvse.ru/znamenitosti/biografiya-vlad-bumaga.html'],
 ];
-export function storefront(React, Link, useLocation, useNavigate, Brand, products, useCart, useUser, icons, Wholesale, MapSection) {
+export function storefront(React, Link, useLocation, useNavigate, Brand, products, useCart, useUser, icons, Wholesale, MapSection, usePrizes) {
   const h=React.createElement;
   const {useState,useEffect}=React;
   const byId=id=>products.find(p=>p.id===id);
@@ -13,10 +13,14 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
   const image=name=>new URL('../images/'+name,import.meta.url).href;
   const games=[['/club/#cases','Кейсы'],['/club/#upgrade','Апгрейдер']];
   function Header() {
-    const {pathname,hash}=useLocation();
-    const {totalItems,setIsCartOpen}=useCart();
+    const {pathname,hash,search}=useLocation();
+    useEffect(()=>{if(pathname.startsWith("/club"))window.scrollTo({top:0,behavior:"instant"});},[pathname,search,hash]);
+    const {totalItems:paid,setIsCartOpen}=useCart();
+    const prizes=usePrizes();
+    const totalItems=paid+products.reduce((n,p)=>n+(prizes?.chips?.[p.id]?.count||0),0);
     const {user,setIsAuthOpen}=useUser();
     useEffect(()=>{
+      if (pathname.startsWith("/club"))return;
       if (!hash) {window.scrollTo({top:0,behavior:'instant'});return;}
       const find=()=>{
         const target=document.getElementById(hash.slice(1));
@@ -29,7 +33,8 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
     },[pathname,hash]);
     return h('header',{className:'store-head'},h('div',{className:'head-inner'},
       h(Brand),
-      h('nav',{'aria-label':'Основная навигация'},...[['/catalog','Вкусы'],...games,['/customers','Покупатели']].map(([to,label])=>h(Link,{key:to,to,'aria-current':(pathname.replace(/\/$/,'')+hash)===to?'page':undefined},label))),
+      h('nav',{'aria-label':'Основная навигация'},...[['/catalog','Вкусы'],...games,['/customers','Покупатели']].map(([to,label])=>h(Link,{key:to,to,'aria-current':(pathname.replace(/\/$/,'')+hash)===(to.replace('/#','#'))?'page':undefined},
+        h('span',{className:'mobile-nav-icon','aria-hidden':true},h(({Вкусы:icons.flavors,Кейсы:icons.cases,Апгрейдер:icons.up,Покупатели:icons.user})[label])),label))),
       h('div',{className:'head-tools'},
         h('button',{type:'button',onClick:()=>setIsCartOpen(true),'aria-label':'Корзина'},h(icons.cart),totalItems>0&&h('b',null,totalItems)),
         user?h(Link,{to:'/profile','aria-label':'Личный кабинет'},h(icons.user)):

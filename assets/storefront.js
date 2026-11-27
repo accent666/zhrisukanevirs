@@ -5,7 +5,7 @@ const photoSources = [
   ['Михаил Литвин · 24СМИ','https://24smi.org/celebrity/100883-mikhail-litvin.html'],
   ['Влад А4 · Узнай Всё','https://uznayvse.ru/znamenitosti/biografiya-vlad-bumaga.html'],
 ];
-export function storefront(React, Link, useLocation, useNavigate, Brand, products, useCart, useUser, icons, Wholesale, MapSection, usePrizes) {
+export function storefront(React, Link, useLocation, useNavigate, Brand, products, useCart, useUser, icons, Wholesale, MapSection, useBuy) {
   const h=React.createElement;
   const {useState,useEffect}=React;
   const byId=id=>products.find(p=>p.id===id);
@@ -14,10 +14,9 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
   function Header() {
     const {pathname,hash,search}=useLocation();
     useEffect(()=>{if(pathname.startsWith("/club"))window.scrollTo({top:0,behavior:"instant"});},[pathname,search,hash]);
-    const {totalItems:paid,setIsCartOpen}=useCart();
-    const prizes=usePrizes();
-    const totalItems=paid+products.reduce((n,p)=>n+(prizes?.chips?.[p.id]?.count||0),0);
-    const {user,setIsAuthOpen}=useUser();
+    const {setIsCartOpen}=useCart();
+    const {user,setIsAuthOpen,chips,balance}=useUser();
+    const totalItems=Object.values(chips).reduce((sum,count)=>sum+count,0);
     useEffect(()=>{
       if (pathname.startsWith("/club"))return;
       if (!hash) {window.scrollTo({top:0,behavior:'instant'});return;}
@@ -35,6 +34,7 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
       h('nav',{'aria-label':'Основная навигация'},...[['/catalog','Вкусы'],...games,['/customers','Покупатели']].map(([to,label])=>h(Link,{key:to,to,'aria-current':(pathname.replace(/\/$/,'')+hash)===(to.replace('/#','#'))?'page':undefined},
         h('span',{className:'mobile-nav-icon','aria-hidden':true},h(({Вкусы:icons.flavors,Кейсы:icons.cases,Апгрейдер:icons.up,Покупатели:icons.user})[label])),label))),
       h('div',{className:'head-tools'},
+        user && h(Link,{to:'/profile/#donate',className:'balance-pill','aria-label':'Баланс '+balance+' ₽. Донат'},h('span',{'aria-hidden':true},'₽'),balance+' ₽'),
         h('button',{type:'button',onClick:()=>setIsCartOpen(true),'aria-label':'Корзина'},h(icons.cart),totalItems>0&&h('b',null,totalItems)),
         user?h(Link,{to:'/profile','aria-label':'Личный кабинет'},h(icons.user)):
           h('button',{type:'button',onClick:()=>setIsAuthOpen(true),'aria-label':'Войти или зарегистрироваться'},h(icons.user)))));
@@ -50,7 +50,7 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
         h('span',null,'Фанатская серия')));
   }
   function Product({item, back}) {
-    const {addToCart}=useCart();
+    const addToCart=useBuy();
     const [value,setValue]=useState('1');
     const quantity=Number(value);
     const valid=Number.isInteger(quantity) && quantity>=1 && quantity<=99;
@@ -84,7 +84,7 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
       else if (id!=='all') params.set('taste',id);
       navigate({pathname:location.pathname,search:params.toString(),hash:location.hash},{replace:true,preventScrollReset:true});
     }
-    const {addToCart}=useCart();
+    const addToCart=useBuy();
     const detail=byId(params.get('product'));
     const catalogParams=new URLSearchParams(params);
     catalogParams.delete('product');
@@ -103,7 +103,7 @@ export function storefront(React, Link, useLocation, useNavigate, Brand, product
       h('div',{className:'pack-grid'},...visible.map(p=>h('article',{key:p.id,className:'den-catalog-card pack-card',style:{'--ink':p.color}},
         h('img',{src:p.image,alt:p.name,loading:'lazy',decoding:'async',width:480,height:640}),
         h('div',{className:'pack-body'},h('small',null,creators[p.id]?'Фан-серия / '+creators[p.id]:p.category+' / '+p.weight),h('h3',null,h(Link,{to:productUrl(p.id),className:'pack-detail-link'},p.name)),
-          h('p',null,p.description),h('div',{className:'pack-buy'},h('strong',null,p.price+' ₽'),h('button',{onClick:()=>addToCart(p)},'В корзину')))))));
+          h('p',null,p.description),h('div',{className:'pack-buy'},h('strong',null,p.price+' ₽'),h('button',{onClick:()=>addToCart(p)},'Купить')))))));
   }
   function Home(){
     const {hash}=useLocation();

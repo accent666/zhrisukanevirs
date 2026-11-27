@@ -17,7 +17,6 @@ const cases = [
   {name:'Зелень и овощи', slug:'garden', ids:['tomato','cream','mushroom','wasabi']}
 
 ];
-const multipliers = [1, 2, 3, 4];
 const rarityLevels = {
   'классические': ['Обычная', 1],
   'мясные': ['Необычная', 2],
@@ -26,7 +25,22 @@ const rarityLevels = {
   'лимитированные': ['Лимитка', 8]
 };
 const rarity = p => rarityLevels[p.category];
-const upgradeOdds = (stake, prize, count) => Math.round(900 * rarity(stake)[1] / (rarity(prize)[1] * count)) / 10;
+function offersFor(stake, products) {
+  if (!stake) return [];
+  const level = rarity(stake)[1];
+  const used = new Set();
+  const offers = [];
+  for (const factor of [2,3,4,6]) {
+    const candidates = products.filter(p => p.id !== stake.id && !used.has(p.id) &&
+      rarity(p)[1] >= level && Number.isInteger(level * factor / rarity(p)[1]));
+    candidates.sort((a,b) => rarity(b)[1] - rarity(a)[1] || a.id.localeCompare(b.id));
+    const prize = candidates[0];
+    if (!prize) continue;
+    used.add(prize.id);
+    offers.push({prize, factor, count:level * factor / rarity(prize)[1], chance:90 / factor});
+  }
+  return offers;
+}
 const percent = value => value.toLocaleString('ru-RU') + '%';
 const empty = () => ({crumbs: 0, chips: {}});
 const tiers = {2:[70,30],3:[55,30,15],4:[45,30,17,8],6:[33,25,18,12,8,4]};
@@ -42,48 +56,13 @@ function dropFrom(box) {
 const motionMs = 2800;
 const winnerSlot = 28;
 const random = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
-const draw = ids => ids[Math.floor(random() * ids.length)];
-let connection;
-
-function database() {
-  if (!connection) connection = new Promise((resolve, reject) => {
-    const open = indexedDB.open('zhrisukanevirs-chip-club', 1);
-    open.onupgradeneeded = () => open.result.createObjectStore('albums');
-    open.onsuccess = () => resolve(open.result);
-    open.onerror = () => reject(open.error);
-  }).catch(error => { connection = undefined; throw error; });
-  return connection;
-}
-
-// Read and update an album inside one transaction, including simultaneous openings in two tabs.
-async function albumFor(owner, change) {
-  const db = await database();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('albums', change ? 'readwrite' : 'readonly');
-    const store = tx.objectStore('albums');
-    const read = store.get(owner);
-    let album, failure;
-    read.onsuccess = () => {
-      album = read.result || empty();
-      if (!change) return;
-      try { change(album); store.put(album, owner); }
-      catch (error) { failure = error; tx.abort(); }
-    };
-    tx.oncomplete = () => {
-      if(change) window.dispatchEvent(new CustomEvent('chip-inventory',{detail:owner}));
-      resolve(album);
-    };
-    tx.onabort = () => reject(failure || tx.error);
-  });
-}
-
 export function createClub(React, products, useAccount, useCart, useLocation, Link) {
   const h = React.createElement;
   const {useState, useEffect, useRef} = React;
   const product = id => products.find(item => item.id === id);
 
   function Customers() {
-    const {addToCart} = useCart();
+    const buy = useBuy();
     return h('main', {className:'club-page'},
       h('div', {className:'club-wrap'},
         h('h1', null, 'Наши постоянные покупатели'),
@@ -95,65 +74,65 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
             h('div', {className:'club-pick'},
               h('img', {src:limitedChip.image, alt:'Лимитированная пачка LITЖрисука'}),
               h('div', null, h('h3', null, limitedChip.name), h('p', null, 'Смородина и лайм · 100 г'),
-                h('button', {className:'club-action', onClick:()=>addToCart(limitedChip)}, 'В корзину · 199 ₽')))))));
+                h('button', {className:'club-action', onClick:()=>buy(limitedChip)}, 'Купить · 199 ₽')))))));
   }
 
-  function usePrizes() {
-    const {user,restoring}=useAccount();
-    const owner=user?'account:'+user.email:'guest';
-    const [snapshot,setSnapshot]=useState(null);
-    useEffect(()=>{
-      if(restoring)return;
-      let active=true;
-      const load=()=>albumFor(owner).then(album=>{if(active)setSnapshot({owner,chips:album.chips});})
-        .catch(()=>{if(active)setSnapshot({owner,error:true});});
-      load();
-      window.addEventListener('chip-inventory',load);
-      window.addEventListener('focus',load);
-      return ()=>{active=false;window.removeEventListener('chip-inventory',load);window.removeEventListener('focus',load);};
-    },[owner,restoring]);
-    return !restoring && snapshot?.owner===owner?snapshot:null;
+  function useBuy() {
+    const {user, setIsAuthOpen, transact} = useAccount();
+    const {setIsCartOpen} = useCart();
+    return async (item,count=1) => {
+      if (!user) { setIsAuthOpen(true); return; }
+      let notice;
+      try {
+        await transact(record => {
+          const price = product(item.id).price;
+          if (!Number.isSafeInteger(count) || count < 1 || count > 99) throw new Error('Проверь количество.');
+          const total = price * count;
+          if (record.balance < total) throw new Error('Недостаточно средств. Нужно '+total+' ₽, на балансе '+record.balance+' ₽.');
+          record.balance -= total;
+          record.chips[item.id] = (record.chips[item.id] || 0) + count;
+          record.orders.unshift({id:crypto.randomUUID(),date:new Date().toLocaleDateString('ru-RU'),status:'Куплено',
+            total,items:[{name:item.name,quantity:count,price}]});
+          record.teeth += Math.floor(total / 100);
+        });
+        notice = 'Куплено: '+item.name+' ×'+count;
+      } catch (error) { notice=error.message; }
+      window.dispatchEvent(new CustomEvent('purchase-notice',{detail:notice}));
+      setIsCartOpen(true);
+    };
   }
 
   function Cart() {
-    const {items,isCartOpen,setIsCartOpen,totalPrice,updateQuantity,addToCart}=useCart();
-    const prizes=usePrizes();
+    const {isCartOpen,setIsCartOpen}=useCart();
+    const {user,chips,balance,transact}=useAccount();
+    const [notice,tell]=useState('');
     const ref=useRef(null);
+    useEffect(()=>{const listen=e=>tell(e.detail);window.addEventListener('purchase-notice',listen);
+      return ()=>window.removeEventListener('purchase-notice',listen);},[]);
+    useEffect(()=>{if(isCartOpen)ref.current.showModal();else {ref.current.close();tell('');}},[isCartOpen]);
+    const rows=products.filter(p=>chips[p.id]>0);
+    async function remove(id,all) {
+      try {await transact(record=>{
+        if(all || record.chips[id]<=1)delete record.chips[id];else if(record.chips[id])record.chips[id]--;
+      });tell('Товар удалён.');} catch(e){tell(e.message);}
+    }
     const close=()=>setIsCartOpen(false);
-    useEffect(()=>{
-      const dialog=ref.current;
-      if(isCartOpen && !dialog.open)dialog.showModal();
-      else if(!isCartOpen && dialog.open)dialog.close();
-    },[isCartOpen]);
-    const rows=products.map(product=>({
-      product, paid:items.find(row=>row.product.id===product.id)?.quantity || 0,
-      prize:prizes?.chips?.[product.id]
-    })).filter(row=>row.paid || row.prize);
-    return h('dialog',{ref,className:'one-cart','aria-labelledby':'cart-title',onCancel:close,
-      onClick:event=>{if(event.target===ref.current)close();}},
-      h('div',{className:'cart-shell'},
-        h('header',null,h('h2',{id:'cart-title'},'Корзина'),h('button',{onClick:close,'aria-label':'Закрыть корзину'},'×')),
-        h('div',{className:'cart-lines'},
-          !prizes && h('p',null,'Загружаем пачки…'),
-          prizes?.error && h('p',{role:'alert'},'Не удалось загрузить товары.'),
-          prizes?.chips && !rows.length && h('p',null,'Корзина пуста. Выбери вкус в каталоге.'),
-          ...rows.map(({product:p,paid,prize})=>h('article',{key:p.id},
-            h('img',{src:p.image,alt:''}),
-            h('div',null,h('h3',null,p.name),
-              h('small',{className:'cart-pack-size'},p.weight,prize ? ' · '+prize.count+' шт. бесплатно' : ''),
-              h('div',{className:'cart-qty'},
-                h('button',{disabled:paid===0,onClick:()=>updateQuantity(p.id,paid-1),'aria-label':'Уменьшить '+p.name},'−'),
-                h('span',null,paid+(prize?.count || 0)),h('button',{onClick:()=>addToCart(p),'aria-label':'Увеличить '+p.name},'+'),
-                h('strong',null,paid*p.price+' ₽')))))),
-        h('footer',null,items.length>0&&h(Link,{to:'/checkout',onClick:close,className:'acid-button'},'Оформить заказ · '+totalPrice+' ₽'),
-          h('button',{onClick:close},'Продолжить покупки'))));
+    return h('dialog',{ref,className:'one-cart','aria-label':'Корзина',onCancel:close,onClick:e=>{if(e.target===ref.current)close();}},
+      h('div',{className:'cart-shell'},h('header',null,h('h2',null,'Корзина'),h('button',{onClick:close,'aria-label':'Закрыть корзину'},'×')),
+        h('div',{className:'cart-lines'},notice && h('p',{role:'status'},notice),
+          !rows.length && h('p',null,'Корзина пуста.'),
+          ...rows.map(p=>h('article',{key:p.id},h('img',{src:p.image,alt:''}),h('div',null,h('h3',null,p.name),
+            h('small',null,chips[p.id]+' шт. · '+p.weight),h('div',{className:'cart-qty'},
+            h('button',{onClick:()=>remove(p.id,false),'aria-label':'Убрать одну пачку '+p.name},'−1'),
+            h('button',{onClick:()=>remove(p.id,true)},'Удалить')))))),
+        h('footer',null,user && h('strong',null,'Баланс · '+balance+' ₽'),h('button',{onClick:close},'Продолжить покупки'))));
   }
 
   function Workshop() {
     const {hash,search} = useLocation();
     const selectedCase=cases.find(box=>box.slug===new URLSearchParams(search).get("case"));
     const view = hash === "#upgrade" ? "upgrade" : "cases";
-    const {user, restoring} = useAccount();
+    const {user, restoring,setIsAuthOpen} = useAccount();
     const owner = user ? 'account:' + user.email : 'guest';
     return h('main', {className:'club-page'}, h('div', {className:'club-wrap'},
       view==='cases' && selectedCase && h(Link,{to:'/club/#cases',className:'product-back'},'Все кейсы'),
@@ -162,36 +141,22 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
         h(Link,{key:item.slug,to:'/club/?case='+item.slug+'#cases',style:{'--accent':product(item.ids[0]).color}},
           h('div',{className:'crate-stack'},...item.ids.slice(0,3).map(id=>h('img',{key:id,src:product(id).image,alt:''}))),
           h('strong',null,item.name),h('small',null,'Вкусов: '+item.ids.length)))):
-      restoring ? h('p',null,'Загрузка…') : h(Album,{key:owner+view+(selectedCase?.slug||''),owner,view,box:selectedCase||cases[0]})));
+      restoring ? h('p',null,'Загрузка…') : !user ? h('button',{className:'club-action',onClick:()=>setIsAuthOpen(true)},'Войти или зарегистрироваться') : h(Album,{key:owner+view+(selectedCase?.slug||''),owner,view,box:selectedCase||cases[0]})));
 
   }
 
   function Album({owner, view, box}) {
-    const [album, setAlbum] = useState(null);
+    const {chips:items,transact} = useAccount();
     const [selected, select] = useState('');
     const [result, show] = useState(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
-    const location=useLocation();
-    const requestedChip=new URLSearchParams(location.search).get('chip');
-    useEffect(()=>{if(requestedChip){select(requestedChip);setWheel(null);show(null);}},[requestedChip,location.key]);
     const [reel, setReel] = useState(null);
     const [wheel, setWheel] = useState(null);
     const round = useRef(0);
     const active = useRef(true);
     const locked = useRef(false);
-    useEffect(() => {
-      active.current = true;
-      let cancelled = false;
-      const refresh = () => albumFor(owner).then(next => {
-        if (!cancelled && !locked.current) setAlbum(next);
-      }).catch(() => { if (!cancelled) setError('Не удалось открыть коллекцию. Разреши хранение данных и обнови страницу.'); });
-      refresh();
-      window.addEventListener('focus', refresh);
-      return () => { cancelled = true; active.current = false; window.removeEventListener('focus', refresh); };
-    }, [owner]);
-    const items = album?.chips || {};
-    const cart = useCart();
+    useEffect(()=>{active.current=true;return ()=>{active.current=false;};},[]);
     const [menu, setMenu] = useState('');
     const sheet = useRef(null);
     useEffect(() => {
@@ -202,31 +167,25 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
       document.documentElement.style.overflow = 'hidden';
       return () => { dialog.close(); document.documentElement.style.overflow = overflow; };
     }, [menu]);
-    const [copies, setCopies] = useState(2);
-    const [desired, setDesired] = useState('');
-    const paid = id => cart.items.find(row => row.product.id === id)?.quantity || 0;
-    const quantity = id => paid(id) + (items[id]?.count || 0);
-    const owned = products.filter(p => quantity(p.id) > 0);
-    const source = owned.find(p => p.id === selected) || owned[0];
-    const options = products.filter(p => source && rarity(p)[1] >= rarity(source)[1] &&
-      rarity(p)[1] * copies > rarity(source)[1]).sort((a,b) => rarity(a)[1] - rarity(b)[1]);
-    const target = options.find(p => p.id === desired) || options[0];
+    const [choice,setChoice] = useState(null);
+    const owned = products.filter(p => items[p.id] > 0);
+    const source = owned.find(p => p.id === selected);
+    const offers = offersFor(source,products);
+    const offer = offers.find(o=>o.factor===choice);
+    const target = offer?.prize;
+    const chance = offer?.chance || 0;
 
-    const chance = source && target ? upgradeOdds(source,target,copies) : 0;
-
-    async function mutate(edit, animate, message, refund) {
-      if (locked.current || !album) return;
+    async function mutate(edit, animate, message) {
+      if (locked.current) return;
       locked.current = true;
       setBusy(true); setError(''); show(null);
       try {
-        let next;
-        try { next = await albumFor(owner, edit); }
-        catch (failure) { refund?.(); throw failure; }
+        await transact(edit);
         if (!active.current) return;
         const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : motionMs;
         animate(++round.current, duration);
         if (duration) await new Promise(resolve => setTimeout(resolve, duration));
-        if (active.current) { setAlbum(next); show(message()); }
+        if (active.current) { show(message()); if(view==='upgrade'){select('');setChoice(null);setWheel(null);} }
       } catch (e) {
         if (active.current) { setWheel(null); setError(e.name === 'Error' ? e.message : 'Не удалось сохранить коллекцию.'); }
       } finally { locked.current = false; if (active.current) setBusy(false); }
@@ -237,62 +196,44 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
       const strip = Array.from({length:winnerSlot + 9}, () => dropFrom(box));
       strip[winnerSlot] = id;
       mutate(next => {
-        next.chips[id] ||= {count:0, rank:0};
-        next.chips[id].count += 1;
+        next.chips[id] = (next.chips[id] || 0) + 1;
 
       }, (key, duration) => setReel({key, duration, strip}), () => ({id, text:'Из кейса «' + box.name + '» · +1 пачка в корзине.'}));
     }
 
     function upgrade() {
-      if (!source || !target || locked.current || !album) return;
-      const fromCart = !items[source.id]?.count;
+      if (!source || !offer || locked.current) return;
       const fraction = random();
       const won = fraction * 100 < chance;
-      const snapshot = {source,target,chance};
-      setWheel({...snapshot, pending:true});
-      if (fromCart) cart.updateQuantity(source.id, paid(source.id) - 1);
-      mutate(next => {
-        if (!fromCart) {
-          const stake = next.chips[source.id];
-          if (!stake?.count) throw new Error('Этой пачки уже нет в корзине.');
-          if (--stake.count === 0) delete next.chips[source.id];
-        }
-        if (won) {
-          next.chips[target.id] ||= {count:0};
-          next.chips[target.id].count += copies;
-        }
-      }, (key, duration) => setWheel({...snapshot,key, duration, angle:fraction * 360}),
-        () => ({id:won ? target.id : source.id, text:won ? 'В корзину добавлено: ' + copies + ' шт.' : 'Промах. Ставка в одну пачку списана.'}),
-        fromCart ? () => cart.addToCart(source, 1, false) : undefined);
+      const snapshot = {source,target,chance,count:offer.count};
+      setWheel({...snapshot,pending:true});
+      mutate(record => {
+        if (!record.chips[source.id]) throw new Error('Этой пачки уже нет в корзине.');
+        if (--record.chips[source.id]===0) delete record.chips[source.id];
+        if (won) record.chips[target.id] = (record.chips[target.id] || 0) + offer.count;
+      }, (key,duration)=>setWheel({...snapshot,key,duration,angle:fraction*360}),
+        ()=>({id:won?target.id:source.id,text:won?'Выигрыш в корзине · '+offer.count+' шт.':'Промах. Ставка списана.'}));
     }
-
-    function choose(setter, value) {
-      setter(value); setWheel(null); show(null);
+    const displayChance = wheel?.chance ?? chance;
+    const displayTarget = wheel?.target || target;
+    function slot(label,item,left) {
+      const body=[item && h('img',{key:'img',src:item.image,alt:''}),
+        h('strong',{key:'name'},item?.name || (left?'Выбрать пачку':'Выигрыш')),
+        h('small',{key:'meta'},item ? rarity(item)[0]+(left?'':' · '+(wheel?.count ?? offer?.count)+' шт.') : (left?'Из корзины':'По шансу или ×'))];
+      return h('div',{className:'stake-slot'},h('small',null,label),left ?
+        h('button',{onClick:()=>setMenu('source'),disabled:busy,'aria-haspopup':'dialog'},...body) :
+        h('div',{className:'auto-prize','aria-live':'polite'},...body));
     }
-    function presets(label, values, current, setter, format) {
-      return h('fieldset',{className:'up-presets'},h('legend',null,label),
-        ...values.map(n=>h('button',{key:n, disabled:busy,'aria-pressed':current===n,onClick:()=>choose(setter,n)},format(n))));
-    }
-    const displayChance = busy && wheel ? wheel.chance : chance;
-    const displayTarget = busy && wheel ? wheel.target : target;
-    function picker(label, side, item) {
-      return h('div',{className:'pack-slot'},h('small',null,label),
-        h('button',{disabled:busy || (side==='source' ? !owned.length : !options.length),
-          onClick:()=>setMenu(side),'aria-haspopup':'dialog','aria-label':label},
-          item && h('img',{src:item.image,alt:''}),
-          h('span',null,h('strong',null,item?.name || 'Нет пачки'),h('small',null,item ? rarity(item)[0] : '—')),
-          h('b',null,'Выбрать')));
-    }
-    const pickingSource = menu === 'source';
-    const list = pickingSource ? owned : options;
-    const pickerDialog = h('dialog',{ref:sheet,className:'upgrade-sheet','aria-labelledby':'upgrade-sheet-title',
-      onCancel:()=>setMenu(''),onClick:e=>{if(e.target===sheet.current)setMenu('');}},
-      h('div',null,h('header',null,h('h2',{id:'upgrade-sheet-title'},pickingSource?'Пачка из корзины':'Выбери выигрыш'),
+    const pickerDialog = h('dialog',{ref:sheet,className:'upgrade-sheet','aria-label':'Пачки из корзины',onCancel:()=>setMenu(''),
+      onClick:e=>{if(e.target===sheet.current)setMenu('');}},h('div',null,h('header',null,h('h2',null,'Пачки из корзины'),
         h('button',{onClick:()=>setMenu(''),'aria-label':'Закрыть'},'×')),
-        h('div',{className:'upgrade-list'},...list.map(p=>h('button',{key:p.id,'aria-pressed':p.id===(pickingSource?source:target)?.id,
-          onClick:()=>{choose(pickingSource?select:setDesired,p.id);setMenu('');}},
-          h('img',{src:p.image,alt:'',loading:'lazy'}),h('span',null,h('strong',null,p.name),h('small',null,rarity(p)[0])),
-          h('b',null,pickingSource ? quantity(p.id)+' шт.' : percent(upgradeOdds(source,p,copies))))))));
+        h('div',{className:'upgrade-list'},!owned.length && h('p',null,'Корзина пуста. Купи пачку или открой кейс.'),
+          ...owned.map(p=>h('button',{key:p.id,onClick:()=>{select(p.id);setChoice(null);setWheel(null);show(null);setMenu('');}},
+            h('img',{src:p.image,alt:''}),h('span',null,p.name,h('small',null,rarity(p)[0])),h('b',null,items[p.id]+' шт.'))))));
+    function presets(label,format) {
+      return h('fieldset',{className:'up-presets'},h('legend',null,label),...offers.map(o=>h('button',{
+        key:o.factor,disabled:busy,'aria-pressed':choice===o.factor,onClick:()=>{setChoice(o.factor);setWheel(null);show(null);}},format(o))));
+    }
     const reward=h('div', {role:'status', className:'club-result'}, result && h(React.Fragment, null,
         h('img', {src:product(result.id).image, alt:''}), h('div',null,h('strong',null,product(result.id).name),h('p',null,result.text))));
     return h(React.Fragment, null,
@@ -305,25 +246,23 @@ export function createClub(React, products, useAccount, useCart, useLocation, Li
                 ...(reel?.strip || [...box.ids,...box.ids]).map((id,index) =>
                   h('div', {key:index, className:'drop-slot', 'data-chip':id,
                     style:{'--glow':product(id).color}}, h('img', {src:product(id).image, alt:''}))))),
-            h('button',{className:'club-action case-spin',disabled:busy||!album,onClick:openCase},busy?'Прокрутка…':'Крутить'),
+            h('button',{className:'club-action case-spin',disabled:busy,onClick:openCase},busy?'Прокрутка…':'Крутить'),
             view==='cases' && reward,
             h('ul',{className:'drop-odds','aria-label':'Шансы выпадения'},...box.ids.map((id,i)=>
               h('li',{key:id},h('img',{src:product(id).image,alt:''}),h('span',null,product(id).name),h('strong',null,tiers[box.ids.length][i]+'%')))))),
         h('section', {className:'club-up', id:'upgrade'},
-          view==='upgrade' && h('div',{className:'up-board'},
-            picker('Ставка · 1 пачка','source',busy ? wheel?.source || source : source),
-            h('div',{className:'up-console'},
+          view==='upgrade' && h('div',{className:'upgrade-station'},
               h('div', {className:'upgrade-dial',style:{'--arc':displayChance+'%'}},
                 h('div',{className:'dial-face'},displayTarget && h('img',{src:displayTarget.image,alt:''}),
                   h('strong',null,displayChance ? percent(displayChance) : '—'),h('small',null,'шанс выигрыша')),
                 h('div',{key:wheel?.key ?? 'idle','aria-hidden':true,className:wheel && !wheel.pending && wheel.chance===displayChance?'dial-arm spinning':'dial-arm',
                   style:{'--angle':(1440+(wheel?.angle ?? 0))+'deg','--run':(wheel?.duration || 0)+'ms'}})),
-              presets('Пачек при выигрыше',multipliers,copies,setCopies,n=>'×'+n),
-              h('button',{className:'club-action',disabled:busy||!source||!target||!album,onClick:upgrade},busy?'Прокрутка…':'Крутить'),
-              h('small',null,!source && !busy ? 'Добавь пачку из каталога или открой кейс.' : !target && !busy ? 'Для этой редкости выбери ×2 или больше.' : 'Чем реже выигрыш и больше пачек, тем ниже шанс. При промахе ставка сгорает.')),
-            picker('Выигрыш · ×'+copies,'target',busy ? displayTarget : target),pickerDialog))),
+              h('div',{className:'stake-slots'},slot('Ставка',wheel?.source || source,true),slot('Приз',displayTarget,false)),
+              source && h('div',{className:'odds-choices'},presets('Шанс',o=>percent(o.chance)),presets('Ценность выигрыша',o=>'×'+o.factor)),
+              h('small',null,source?'Чем больше ценность выигрыша, тем ниже шанс. Ставка — одна пачка.':'Выбери пачку в левой ячейке.'),
+              h('button',{className:'club-action',disabled:busy||!offer,onClick:upgrade},busy?'Прокрутка…':'Крутить'),pickerDialog))),
       view==='upgrade' && reward,
       error && h('p', {role:'alert'}, error));
   }
-  return {Workshop, Customers, Cart, usePrizes};
+  return {Workshop, Customers, Cart, useBuy};
 }

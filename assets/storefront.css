@@ -138,3 +138,14 @@ body{background:#0c0a0e}
 .upgrade-list{display:grid;gap:6px;overflow-y:auto;overscroll-behavior:contain;padding:0 12px 12px}
 .upgrade-list button[aria-pressed=true]{border-color:#cfff38}
 @media(max-width:760px){.up-board{grid-template-columns:minmax(0,1fr)}.pack-slot{grid-column:1}.up-console{grid-row:3}.pack-slot button{min-height:68px}.pack-slot img{width:38px;height:44px}.upgrade-sheet{inset:auto 0 0;margin:0;width:100%;max-width:none;max-height:74dvh;border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom)}}
+
+.upgrade-station{display:grid;justify-items:center;gap:15px;max-width:520px;margin:auto}
+.upgrade-station .upgrade-dial{width:clamp(150px,35vw,205px)}
+.stake-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%}
+.stake-slot>small{display:block;color:#e7d6ee;font-weight:700;margin-bottom:5px}
+.stake-slot button,.auto-prize{width:100%;height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:#211625;border:1px solid #694773;border-radius:12px;color:white;line-height:1.1;padding:6px}
+.stake-slot button{border-color:#b5e34d}.stake-slot img{height:46px;width:38px;object-fit:cover;border-radius:5px}.stake-slot small{font-size:.78rem}.auto-prize small,.stake-slot button small{color:#d7c4dd}
+.odds-choices{display:grid;gap:9px}.odds-choices fieldset{border:0;padding:0}.odds-choices button{min-width:53px;min-height:40px}.odds-choices button[aria-pressed=true]{background:#ceff38;color:#221526}
+.head-tools a.balance-pill{width:auto;padding:0 8px;gap:4px;white-space:nowrap;font-size:.85rem}.balance-pill span{border:1px solid;border-radius:50%;padding:1px 3px;font-size:.68rem}
+.head-inner>a:first-child>div{width:3.7rem;height:3.7rem}.head-inner>a:first-child>span{font-size:2rem}
+@media(max-width:650px){.head-inner>a:first-child>div{width:clamp(30px,10vw,48px);height:auto}.head-inner>a:first-child>span{font-size:clamp(1.05rem,5vw,1.55rem)}.head-inner>a:first-child{gap:3px}.head-tools{gap:3px}.head-tools :is(button,a):not(.balance-pill){width:34px}}

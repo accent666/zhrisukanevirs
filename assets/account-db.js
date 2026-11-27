@@ -1,11 +1,11 @@
-const sessionKey = 'zhrisukanevirs.account-session';
+const sessionKey = 'zhrisukanevirs.account-session.wallet1';
 const lifetime = 30 * 24 * 60 * 60 * 1000;
 let database;
 
 function openDatabase() {
   if (!database) {
     database = new Promise((resolve, reject) => {
-      const request = indexedDB.open('zhrisukanevirs-accounts', 1);
+      const request = indexedDB.open('zhrisukanevirs-accounts-wallet1', 1);
       request.onupgradeneeded = () => {
         request.result.createObjectStore('accounts', {keyPath: 'email'});
         request.result.createObjectStore('sessions');
@@ -43,8 +43,8 @@ async function hashPassword(password, salt) {
   return Array.from(new Uint8Array(bits), n => n.toString(16).padStart(2, '0')).join('');
 }
 
-function publicAccount({profile, orders, teeth}) {
-  return {profile, orders, teeth};
+function publicAccount({profile, orders, teeth, balance, chips}) {
+  return {profile, orders, teeth, balance, chips};
 }
 
 export async function registerAccount({email, name, password}) {
@@ -55,7 +55,7 @@ export async function registerAccount({email, name, password}) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const account = {
     email, salt, passwordHash: await hashPassword(password, salt),
-    profile: {email, name, phone: '', city: '', address: ''}, orders: [], teeth: 0
+    profile: {email, name, phone: '', city: '', address: ''}, orders: [], teeth: 0, balance: 300, chips: {}
   };
   try {
     await request('accounts', 'readwrite', table => table.add(account));
@@ -106,7 +106,7 @@ export async function endSession() {
 
 export function onSessionChange(listener) {
   const handle = event => {
-    if (event.key === sessionKey || event.key === null) listener();
+    if (event.key === sessionKey || event.key === 'chips-wallet-revision' || event.key === null) listener();
   };
   window.addEventListener('storage', handle);
   return () => window.removeEventListener('storage', handle);
@@ -137,7 +137,7 @@ export async function updateAccount(email, edit) {
         transaction.abort();
       }
     };
-    transaction.oncomplete = () => resolve(publicAccount(account));
+    transaction.oncomplete = () => { localStorage.setItem('chips-wallet-revision',crypto.randomUUID()); resolve(publicAccount(account)); };
     transaction.onabort = () => reject(failure || transaction.error);
   });
 }

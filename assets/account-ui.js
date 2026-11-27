@@ -1,17 +1,17 @@
-import {registerAccount, logIn, restoreSession, endSession, onSessionChange, updateAccount} from './account-db.js';
+import {registerAccount, logIn, restoreSession, endSession, onSessionChange, updateAccount} from './account-db.js?v=11';
 
 const mascot = new URL('../images/mascot-hero.png', import.meta.url).href;
 const fields = [['name', 'Имя', 'name'], ['email', 'Почта', 'email'],
   ['phone', 'Телефон', 'tel'], ['city', 'Город', 'address-level2'],
   ['address', 'Адрес', 'street-address']];
-const tabs = [['orders', 'Мои заказы'], ['profile', 'Профиль'], ['teeth', 'Зубы']];
+const tabs = [['orders', 'Мои заказы'], ['profile', 'Профиль'], ['teeth', 'Зубы'], ['donate','Донат']];
 const rubles = new Intl.NumberFormat('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0});
 
 function errorText(error) {
   return error.name === 'Error' ? error.message : 'Не удалось сохранить данные в браузере. Попробуй ещё раз.';
 }
 
-export function createAccountUI(React, Context, useUser, useNavigate) {
+export function createAccountUI(React, Context, useUser, useNavigate, useLocation) {
   const {createElement: el, useEffect, useRef, useState} = React;
 
   function button(label, onClick, className, props = {}) {
@@ -54,6 +54,7 @@ export function createAccountUI(React, Context, useUser, useNavigate) {
       await endSession();
     };
     const save = async edit => {
+      if (!account) throw new Error('Войди в аккаунт.');
       const current = revision.current;
       const updated = await updateAccount(account.profile.email, edit);
       if (current === revision.current) setAccount(updated);
@@ -61,6 +62,7 @@ export function createAccountUI(React, Context, useUser, useNavigate) {
 
     return el(Context.Provider, {value: {
       user: account?.profile ?? null, restoring, authenticate, logout, isAuthOpen, setIsAuthOpen,
+      balance: account?.balance ?? 0, chips: account?.chips ?? {}, transact: save,
       orders: account?.orders ?? [], teeth: account?.teeth ?? 0,
       updateProfile: profile => save(record => {
         for (const field of ['name', 'phone', 'city', 'address']) {
@@ -131,11 +133,13 @@ export function createAccountUI(React, Context, useUser, useNavigate) {
   }
 
   function MemberProfile({user}) {
-    const {orders, teeth, logout, updateProfile} = useUser();
+    const {orders, teeth, logout, updateProfile,balance,transact} = useUser();
     const navigate = useNavigate();
-    const [tab, setTab] = useState('orders');
+    const route=useLocation();
+    const [tab, setTab] = useState(route.hash==='#donate'?'donate':'orders');
     const [message, setMessage] = useState(null);
     const [busy, setBusy] = useState(false);
+    useEffect(()=>{if(route.hash==='#donate')setTab('donate');},[route.key]);
     const discount = Math.min(Math.floor(teeth / 100) * 10, 50);
     const progress = discount === 50 ? 100 : teeth % 100;
 
@@ -188,6 +192,10 @@ export function createAccountUI(React, Context, useUser, useNavigate) {
                 readOnly: name === 'email', maxLength: name === 'address' ? 160 : 60}))),
             button(busy ? 'Сохраняем…' : 'Сохранить профиль', undefined, 'den-primary', {type: 'submit', disabled: busy}),
             message && el('p', {role: message.error ? 'alert' : 'status', className: message.error ? 'den-error' : 'den-success'}, message.text)),
+          tab === 'donate' && el('div', {className:'den-loyalty'},el('strong',null,'Баланс · '+balance+' ₽'),
+            el('p',null,'Демо-пополнение игровыми рублями.'),
+            button('Пополнить на 100 ₽',async()=>{if(busy)return;setBusy(true);try{await transact(record=>{record.balance+=100;});setMessage({text:'Начислено 100 ₽.'});}catch(e){setMessage({text:errorText(e)});}finally{setBusy(false);}},'den-primary',{disabled:busy}),
+            message && el('p',{role:'status'},message.text)),
           tab === 'teeth' && el('div', {className: 'den-loyalty'},
             el('p', null, discount === 50 ? 'Максимальный уровень открыт.' : 'До следующего уровня: ' + (100 - progress) + ' зубов.'),
             el('progress', {max: 100, value: progress, 'aria-label': 'Прогресс до следующей скидки'}),
